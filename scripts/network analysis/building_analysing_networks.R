@@ -19,8 +19,8 @@ samples_list <- read.xlsx("data/feces_sample_database.xlsx", sheet = "samples")
 colnames(samples_list)
 head(samples_list)
 
-###Reading my function that returns final data frame with all data organized and cleaned - see generate_final_data.r for more details
-source('scripts/organise&clean_metabarcoding.r')
+###Reading function that returns final data frame with all data organized and cleaned - see organise&clean_metabarcoding.r for more details
+source('scripts/organize&clean_metabarcoding.r')
 
 zbj_data <- final_metbar(data = zbj,sample_list = samples_list, remove_samples=F,otus_clean=T,keep_class=NULL,remove_NAorders=T,remove_NAfamily=F,desired_species=NULL)
 head(zbj_data)
