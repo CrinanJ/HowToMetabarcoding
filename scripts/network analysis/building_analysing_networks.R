@@ -8,22 +8,28 @@
 ###################################################
 
 ###importing metabarcoding data 
-#zbj primer 
-zbj <- read.csv2("data/16Farms_OTU_Table_withConfidence.csv") 
+#zbj primer: 224 samples and 3105 unique OTUS
+zbj <- read.csv2("data/16Farms_OTU_Table_withConfidence.csv", dec = ".", row.names = 1,header = TRUE, check.names=FALSE,na.strings=c("NA", "NULL", "", ".")) 
 colnames(zbj)
 head(zbj)
 
-###Reading my function that returns final data frame with all data organized and cleaned - see generate_final_data.r for more details
-source('scripts/generate_final_data.r')
+###importing species information for each sample
+library(openxlsx)#read excel and sheet
+samples_list <- read.xlsx("data/feces_sample_database.xlsx", sheet = "samples")
+colnames(samples_list)
+head(samples_list)
 
-zbj_data <- final_metbar(data = zbj,remove_samples=T,otus_clean=T,keep_class=c("Arachnida","Insecta"),remove_NAorders=T,remove_NAfamily=F,desired_species=NULL)
+###Reading my function that returns final data frame with all data organized and cleaned - see generate_final_data.r for more details
+source('scripts/organise&clean_metabarcoding.r')
+
+zbj_data <- final_metbar(data = zbj,sample_list = samples_list, remove_samples=F,otus_clean=T,keep_class=NULL,remove_NAorders=T,remove_NAfamily=F,desired_species=NULL)
 head(zbj_data)
 dim(zbj_data)
-#585 rows and 17 columns
+#403 rows and 18 columns
 n_distinct(zbj_data$prey)#number of different otus
-#306
-n_distinct(zbj_data$predator)#number of samples - originally I had 269 samples MAYBE I need to remove a control that has a lot of reads
-#178
+#196
+n_distinct(zbj_data$predator)#number of samples - originally 224 samples 
+#166
 
 
 ####aggregate data by site and species
