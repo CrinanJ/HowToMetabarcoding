@@ -13,7 +13,7 @@ colnames(zbj)
 
 ###importing species information for each sample
 library(openxlsx)#read excel and sheet
-samples_list <- read.xlsx("data/feces_sample_database.xlsx", sheet = "samples")
+samples_list <- read.xlsx("data/faeces_sample_database.xlsx", sheet = "samples")
 colnames(samples_list)
 
 ###Reading function that returns final data frame with all data organized and cleaned - see organize&clean_metabarcoding.r for more details

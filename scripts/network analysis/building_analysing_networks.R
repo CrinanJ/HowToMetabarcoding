@@ -1,6 +1,6 @@
 ##################################################
 ## Project: metabarcoding and networks
-## Script purpose: creating, plotting and analysing bipartite networks 
+## Script purpose: creating, plotting and analyzing bipartite networks 
 ## Date: 10/09/2021
 ## Author: Diogo F. Ferreira (ferreiradfa@gmail.com)
 ## Packages: bipartite, ggplot2, ggthemes, GISTools and RColorBrewer 
@@ -15,7 +15,7 @@ head(zbj)
 
 ###importing species information for each sample
 library(openxlsx)#read excel and sheet
-samples_list <- read.xlsx("data/feces_sample_database.xlsx", sheet = "samples")
+samples_list <- read.xlsx("data/faeces_sample_database.xlsx", sheet = "samples")
 colnames(samples_list)
 head(samples_list)
 
@@ -53,8 +53,8 @@ head(zbj_species)
 
 write.csv(zbj_species,"outputs/data/network analysis/n_samples_network_zbj.csv",row.names = FALSE)
 
-##I'll remove species that have less than 2 samples per landscape
-species_remove_zbj <- unique(zbj_species[zbj_species$samples < 2, ])
+##I'll remove species that have less than 2 samples (ideally the cut-off should be higher - at least 10 samples) per landscape
+species_remove_zbj <- unique(zbj_species[zbj_species$samples < 10, ])
 levels(as.factor(species_remove_zbj$predator))
 #I need to remove 3 species
 
