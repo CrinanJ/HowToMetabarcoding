@@ -45,7 +45,7 @@ occurrence_grouped<- data_occurrence %>%
 mod_foo<-glm(otu_6 ~ landscape, family = "poisson", data = occurrence_grouped)
 summary(mod_foo)
 DHARMa::testOverdispersion(mod_foo)
- 
+  
 ## %FOO
 
 ## Weighted Occurrence
