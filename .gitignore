@@ -2,3 +2,8 @@
 .Rhistory
 .RData
 .Ruserdata
+<<<<<<< HEAD
+=======
+generate_final_data.R
+glmm_examples.R
+>>>>>>> 62846a936929b187c82b648ca12eb6a602265656
