@@ -22,7 +22,7 @@ head(samples_list)
 ###Reading function that returns final data frame with all data organized and cleaned - see organise&clean_metabarcoding.r for more details
 source('scripts/organize&clean_metabarcoding.r')
 
-zbj_data <- final_metbar(data = zbj,sample_list = samples_list, remove_samples=F,otus_clean=T,keep_class=NULL,remove_NAorders=T,remove_NAfamily=F,desired_species=NULL)
+zbj_data <- final_metbar(data = zbj,sample_list = samples_list, remove_samples=F,otus_clean=1, keep_class=NULL,remove_NAorders=T,remove_NAfamily=F,desired_species=NULL)
 head(zbj_data)
 dim(zbj_data)
 #403 rows and 18 columns
@@ -206,7 +206,6 @@ for (i in 1:length(zbj_nets)){
   ggsave(paste("outputs/plots/network analysis/null_model_modularity","_",names(zbj_nets[i]),".png",sep = ""), plot = plot, width =5 , height = 5) #To save the plot
   zscores <- rbind(zscores,data.frame(metric = "Modularity", network=names(zbj_nets[i]),value = mod@likelihood, zscore=as.vector(zscore_mod)))
 }
-
 
 #In the case you want to plot the modules - not very useful for big networks
 mod_Bokito<-computeModules(zbj_nets$Bokito)

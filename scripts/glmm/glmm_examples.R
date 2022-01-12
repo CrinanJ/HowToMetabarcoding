@@ -20,7 +20,7 @@ colnames(samples_list)
 
 ###Reading function that returns final data frame with all data organized and cleaned - see organize&clean_metabarcoding.r for more details
 source('scripts/organize&clean_metabarcoding.r')
-zbj_data <- final_metbar(data = zbj,sample_list = samples_list, remove_samples=F,otus_clean=T,keep_class=NULL,remove_NAorders=T,remove_NAfamily=F,desired_species=NULL)
+zbj_data <- final_metbar(data = zbj,sample_list = samples_list, remove_samples=F,otus_clean=1,keep_class=NULL,remove_NAorders=T,remove_NAfamily=F,desired_species=NULL)
 colnames(zbj_data)
 
 ###Casting dataframe into matrix predator x prey
