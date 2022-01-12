@@ -39,7 +39,7 @@ zbj_aggr <- zbj_data %>%
     summarise(weight=sum(weight),proportion=mean(proportion),freq_otus=n())
 head(zbj_aggr)
 dim(zbj_aggr)
-#470 rows and 7 columns
+#319 rows and 7 columns
 levels(as.factor(zbj_aggr$predator))#check how and what bats/bird species I have
 #11 
 
@@ -51,12 +51,12 @@ zbj_species <- zbj_data %>%
     rename("predator"=species_code)
 head(zbj_species)
 
-write.csv(zbj_species,"outputs/data/network analysis/n_samples_network_zbj.csv",row.names = FALSE)
+write.csv(zbj_species,"outputs/results/network analysis/n_samples_network_zbj.csv",row.names = FALSE)
 
-##I'll remove species that have less than 2 samples (ideally the cut-off should be higher - at least 10 samples) per landscape
-species_remove_zbj <- unique(zbj_species[zbj_species$samples < 10, ])
+##I'll remove species that have less than 5 samples (ideally higher the cut-off the better) per landscape 
+species_remove_zbj <- unique(zbj_species[zbj_species$samples < 5, ])
 levels(as.factor(species_remove_zbj$predator))
-#I need to remove 3 species
+#I need to remove 5 species
 
 zbj_filtered <- data.frame()
 for (i in 1:length(unique(zbj_aggr$landscape))){
@@ -149,132 +149,48 @@ for (i in 1:length(zbj_nets)){
 
 
 ######Network analysis
-####more specific analysis
-###Creating 10000 new networks based on our networks for the null model
-#should I create null models for every test or can I always use the same?
-nullnetworks<-lapply(zbj_nets, nullmodel,N=10000,method="r2dtable")
-#r2dtable: Generates null matrices based on Patefield's method.
-#vaznull: Generates null matrices based on the Vazquez's method (connectance is kept constant).
-#Method can be changed (see nullmodel guide in bipartite), but I personally find Vazquez's method tends to provide the most meaningful comparison.
+###Creating 10000 new networks based on on previous networks for the null model
+nullnetworks<-lapply(zbj_nets, nullmodel,N=1000,method="vaznull")
+#Method can be changed (see nullmodel guide in bipartite package info)
 
-#I can also use CI at 95%:
-Vazquez.null.wNODF<-unlist(sapply(zbj_nets, networklevel, index="weighted NODF"))
-mean(Vazquez.null.wNODF)
-quantile(unlist(Vazquez.null.wNODF), c(0.025, 0.975))
-
-
-###Network/Group level metrics
+###Network level metrics
 ##creating a empty data frame to store all zscores: z-scores are used to know if our metric values are significant compared with the null model
 zscores <- data.frame()
 
-##Generality 
-#Weighted mean effective number of low level species per high level species (generality), weighted by their marginal totals (row sums). See Tylianakis et al. (2007) and Bersier et al. (2002). This is identical to exp(“partner diversity”, i.e., simply the Jost (2006)-recommended version of diversity
-#lower values mean that networks are highly specialized
 library(ggplot2)
+##Nestedness
+#calculating nestedness for each of our networks as weighted nestedness based on overlap and decreasing fill (WNODF). High values indicate nestedness.
 for (i in 1:length(zbj_nets)){
   net <- zbj_nets[[i]]
   null <- nullnetworks[[i]]
-  #measuring generality for each network
-  gener<-grouplevel(net,index="generality",weighted=TRUE,level="higher")
-  #measuring generality for each of the null models
-  nullgener<-unlist(sapply(null,grouplevel,index="generality",weighted=TRUE,level="higher"))
-  #calculates the z-score
-  zscore_gener <- (gener-mean(nullgener))/sd(nullgener) ##z-score is negative - what does it means? Should I create binary networks because of that?
-  #plot to see wheres does our zscore stands compared to the null models
-  plot <- ggplot()+
-    aes(nullgener)+
-    geom_histogram(bins=100,colour="coral2",fill="darkolivegreen3")+
-    theme_classic()+
-    geom_vline(xintercept=gener,linetype="dashed",size=0.1,colour="red")+
-    ggtitle(names(zbj_nets[i])) 
-  print(plot)
-  ggsave(paste("outputs/plots/network analysis/generality/null_model_",names(zscore_gener),"_",names(zbj_nets[i]),".png",sep = ""), plot = plot, width =5 , height = 5) #To save the plot
-  zscores <- rbind(zscores,data.frame(metric = names(zscore_gener), network=names(zbj_nets[i]),value = gener, zscore=as.vector(zscore_gener)))
-}
-
-
-##Vulnerability
-#Weighted mean effective number of HL species per LL species (vulnerability), weighted by their marginal totals (row sums). See Tylianakis et al. (2007) and Bersier et al. (2002). This is identical to exp(“partner diversity”, i.e., simply the Jost (2006)-recommended version of diversity. 
-#Lower values mean that networks are highly specialized
-for (i in 1:length(zbj_nets)){
-  net <- zbj_nets[[i]]
-  null <- nullnetworks[[i]]
-  #measuring vulnerability for each network
-  vuln<-grouplevel(net,index="vulnerability",weighted=TRUE,level="lower")#
-  #measuring vulnerability for each of the null models
-  nullvuln<-unlist(sapply(null,grouplevel,index="vulnerability",weighted=TRUE,level="lower"))
+  #measuring nestedness for each network
+  nest<-networklevel(net,index="weighted NODF")#
+  #measuring nestedness for each of the null models
+  nullnest<-unlist(sapply(null,networklevel,index="weighted NODF"))
   #calculates the z-score 
-  zscore_vuln <- (vuln-mean(nullvuln))/sd(nullvuln)
+  zscore_nest <- (nest-mean(nullnest))/sd(nullnest)
   #plot to see wheres does our zscore stands compared to the null models
   plot <- ggplot()+
-    aes(nullvuln)+
-    geom_histogram(bins=100,colour="coral2",fill="darkolivegreen3")+
+    aes(nullnest)+
+    geom_histogram(bins=100,fill="darkolivegreen3",colour="black")+
     theme_classic()+
-    geom_vline(xintercept=vuln,linetype="dashed",size=0.1,colour="red")+
+    geom_vline(xintercept=nest,linetype="solid",size=1,colour="red")+
     ggtitle(names(zbj_nets[i])) 
   print(plot)
-  ggsave(paste("outputs/plots/network analysis/vulnerability/null_model_",names(zscore_vuln),"_",names(zbj_nets[i]),".png",sep = ""), plot = plot, width =5 , height = 5) #To save the plot
-  zscores <- rbind(zscores,data.frame(metric = names(zscore_vuln), network=names(zbj_nets[i]),value = vuln, zscore=as.vector(zscore_vuln)))
+  ggsave(paste("outputs/plots/network analysis/null_model_",names(zscore_nest),"_",names(zbj_nets[i]),".png",sep = ""), plot = plot, width =5 , height = 5) #To save the plot
+  zscores <- rbind(zscores,data.frame(metric = names(zscore_nest), network=names(zbj_nets[i]),value = nest, zscore=as.vector(zscore_nest)))
 }
 
-
-##Interaction evenness
-#Shannon’s evenness for the web entries. Note that the two options are rather different. By definition, IE = H/Hmax; H = -sum(p.i.mat*log(p.i.mat)), where p.i.mat = matrix/sum(entries in matrix). This means, when calculating H, do we treat all possible links as species, and the interactions (cell values) as measure of their abundance? By definition, Hmax = ln(N). The key question is: What is the right value for N? Since we treat the matrix cells as species, it is (clearly?) the number of matrix cells, i.e. number of higher trophic level species x number of lower trophic level species. We think this logic justifies our default "prod". However, others argue in favour of N=number of links. Please see note for our discussion on this point.
-#Lower values mean that networks are highly specialized
-for (i in 1:length(zbj_nets)){
-  net <- zbj_nets[[i]]
-  null <- nullnetworks[[i]]
-  #measuring interaction evenness for each network
-  even<-networklevel(net,index="interaction evenness",weighted=TRUE)
-  #measuring interaction evenness for each of the null models
-  nulleven<-unlist(sapply(null,networklevel,index="interaction evenness",weighted=TRUE))
-  #calculates the z-score
-  zscore_even <- (even-mean(nulleven))/sd(nulleven)
-  #plot to see wheres does our zscore stands compared to the null models
-  plot <- ggplot()+
-    aes(nulleven)+
-    geom_histogram(bins = 100,colour="coral2",fill="darkolivegreen3")+
-    theme_classic()+
-    geom_vline(xintercept=even,linetype="dashed",size=0.1,colour="red")+
-    ggtitle(names(zbj_nets[i])) 
-  print(plot)
-  ggsave(paste("outputs/plots/network analysis/interaction evenness/null_model_",names(zscore_even),"_",names(zbj_nets[i]),".png",sep = ""), plot = plot, width =5 , height = 5) #To save the plot
-  zscores <- rbind(zscores,data.frame(metric = names(zscore_even), network=names(zbj_nets[i]),value = even,zscore=as.vector(zscore_even)))
-}
-
-##Specialization H2'
-#H2’ is an index describing the level of “complementarity specialisation” (or should one say: selectiveness?) of an entire bipartite network (Blüthgen et al. 2006). It describes to which extent observed interactions deviate from those that would be expected given the species marginal totals.
-#Higher values mean that networks are highly specialized, i.e., more selective a species the larger is H2’ for the web
-for (i in 1:length(zbj_nets)){
-  net <- zbj_nets[[i]]
-  null <- nullnetworks[[i]]
-  #measuring specialization for each network
-  h2<-H2fun(net,H2_integer=TRUE)
-  #measuring specialization for each of the null models
-  nullh2<-sapply(null,H2fun,H2_integer=TRUE)
-  #calculates the z-score
-  zscore_h2 <- (h2[1]-mean(nullh2[1,]))/sd(nullh2[1,])
-  #plot to see wheres does our zscore stands compared to the null models
-  plot <- ggplot()+
-    aes(nullh2[1,])+
-    geom_histogram(bins = 100,colour="coral2",fill="darkolivegreen3")+
-    theme_classic()+
-    geom_vline(xintercept=h2[1],linetype="dashed",size=1,colour="red")+
-    ggtitle(names(zbj_nets[i])) 
-  print(plot)
-  ggsave(paste("outputs/plots/network analysis/h2/null_model_",names(zscore_h2),"_",names(zbj_nets[i]),".png",sep = ""), plot = plot, width =5 , height = 5) #To save the plot
-  zscores <- rbind(zscores,data.frame(metric = names(zscore_h2), network=names(zbj_nets[i]),value = h2[1],zscore=as.vector(zscore_h2)))
-}
 
 ##Modularity
-#calculating modularity for each of our networks - using a higher number of stepps to inrease precision
+#calculating modularity for each of our networks. High values indicate modularity.
 for (i in 1:length(zbj_nets)){
   net <- zbj_nets[[i]]
   null <- nullnetworks[[i]]
   #measuring Modularity for each network
-  mod<-computeModules(net,method="Beckett",steps=1000)
+  mod<-computeModules(net,method="Beckett",steps=1000)#higher number of steps to increase precision
   #measuring Modularity for each of the null models
-  nullmod<-sapply(null,computeModules,method="Beckett",steps=1000)
+  nullmod<-sapply(null,computeModules,method="Beckett",steps=1000)#higher number of steps to increase precision
   #Creating object with all likelihood 
   nulllikeli <- sapply(nullmod,function(x)x@likelihood)
   #calculates the z-score based on the likelihood 
@@ -282,17 +198,17 @@ for (i in 1:length(zbj_nets)){
   #plot to see wheres does our zscore stands compared to the null models
   plot <- ggplot()+
     aes(nulllikeli)+
-    geom_histogram(binwidth = 0.001,colour="coral2",fill="darkolivegreen3")+
+    geom_histogram(binwidth = 0.001,fill="darkolivegreen3",colour="black")+
     theme_classic()+
-    geom_vline(xintercept=mod@likelihood,linetype="dashed",size=1,colour="red")+
+    geom_vline(xintercept=mod@likelihood,linetype="solid",size=1,colour="red")+
     ggtitle(names(zbj_nets[i])) 
   print(plot)
-  ggsave(paste("outputs/plots/network analysis/modularity/null_model_",names(zscore_mod),"_",names(zbj_nets[i]),".png",sep = ""), plot = plot, width =5 , height = 5) #To save the plot
+  ggsave(paste("outputs/plots/network analysis/null_model_modularity","_",names(zbj_nets[i]),".png",sep = ""), plot = plot, width =5 , height = 5) #To save the plot
   zscores <- rbind(zscores,data.frame(metric = "Modularity", network=names(zbj_nets[i]),value = mod@likelihood, zscore=as.vector(zscore_mod)))
 }
 
 
-#in the case I want to plot the modules 
+#In the case you want to plot the modules - not very useful for big networks
 mod_Bokito<-computeModules(zbj_nets$Bokito)
 plotModuleWeb(mod_Bokito)
 
@@ -315,49 +231,3 @@ metrics_plot <- ggplot(data=zscores, aes(x=network, y=value))+ #again, excluding
 metrics_plot
 
 ggsave("outputs/plots/network analysis/network_metrics_zbj.png", plot = metrics_plot, width =15 , height = 15) #To save the plot
-
-###Species level metrics
-##Specialization D'
-#The d’ index is derived from Kulback-Leibler distance (as is Shannon’s diversity index), and calculates how strongly a species deviates from a random sampling of interacting partners available. It ranges from 0 (no specialization) to 1 (perfect specialist). In the case of a pollination web, a pollinator may be occurring only on one plant species, but if this species is the most dominant one, there is limited evidence for specialization. Hence this pollinator would receive a low value. In contrast,a pollinator that occurs only on the two rarest plants would have a very high value of d’.
-#The way this function is implemented, it calculates expected values for each cell based on the product of observed marginal sums (i.e. column and row sums) times sum(web). Then it rounds off to integers and allocates the remaining interactions in two steps: First, all columns and rows with marginal sums of 0 obtain one interaction into the cell with the highest expected value. Secondly, all remaining interactions are distributed according to difference between present and expected value: those cells with highest discrepancy receive an interaction until the sum of all entries in the new web equals those in the original web. Now the d-values for this web are calculated and used as dmin.
-#dfun returns the d’ values for the lower trophic level. Use fun(t(web)) to get the d’-values for the higher trophic level (as does specieslevel). If you want to provide external abundances, you must provide those of the OTHER trophic level! (This help file is written as if you were interested in the lower trophic level.)
-#Higher values mean that species are highly specialized
-
-d_species <- data.frame()#to store d' values
-for (i in 1:length(zbj_nets)){
-  net <- t(zbj_nets[[i]])#i need to transpose to get d' for my higher level (birds)
-  #measuring specialization for each network
-  d<-data.frame(dfun(net, abuns=NULL))
-  d$species <- row.names(d)
-  #save file
-  d_species <- rbind(d_species,data.frame(d,network=names(zbj_nets[i])))
-}
-
-#changing order of columns
-colnames(d_species)
-d_species <- d_species[c(6,5,1:4)]#reordering data frame
-
-##saving d value to csv file
-write.csv2(d_species,"outputs/results/network analysis/network_dvalues_zbj.csv",row.names = FALSE)
-
-
-##plotting d values
-library(ggthemes)
-#The errorbars overlapped, so use position_dodge to move them horizontally
-plot_d <- ggplot(data=d_species, aes(x=network, y=dprime))+ #again, excluding intercept because estimates so much larger
-  geom_bar(stat='identity')+
-  #scale_shape(solid=F)+ #no fill for points
-  facet_wrap(~species,ncol=2)+#,scales="free_y")+
-  theme_bw()+ 
-  xlab("")+ ylab("d'bird")+
-  theme(axis.title.x=element_text(size=25))+
-  theme(axis.title.y=element_text(size=25))+
-  theme(axis.text.x = element_text(colour = "black", size= 15, angle = 45,vjust = 1, hjust = 1))+
-  theme(axis.text.y=element_text(size=25))+
-  theme(legend.text=element_text(size=25), legend.title = element_text(size=25), legend.position="bottom", legend.key = element_blank())+
-  theme(strip.text.x = element_text(face="italic",size=25))+
-  theme(strip.background = element_rect(fill = 'grey'))
-plot_d
-
-ggsave("outputs/plots/network analysis/network_dvalues_zbj.png", plot = plot_d, width =15 , height = 15) #To save the plot
-
