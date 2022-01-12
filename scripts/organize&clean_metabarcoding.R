@@ -31,13 +31,13 @@
 #data: metabarcoding data with samples starting with a "X" and control with "Control". 
 #samples: sample_list with species information for each sample in data (lab.nbr,year,season,landscape,farm,species,species_code,animal). See line 117.
 #remove_samples: TRUE if you want to remove samples that have less reads then the controls. Using using "Control" to identify control columns. See line 54.
-#otus_clean: TRUE if I want to exclude OTUs with less than 1% of total number of reads per sample. See line 144.
+#otus_clean: 0 to 5 if you want to exclude MOTUs with less than 0% to 5% of total number of reads per sample. Default is 1 for 1% (e.g. add 0.01 for 0.01%). Values above 5 return error. See line 144.
 #keep_class: only keeping targeted taxonomic classes (default is c("Arachnida","Insecta")). If NULL keeps all classes. See line 157.
-#remove_NAorders: TRUE if I want to remove OTUs that are not identified until order. See line 168.
-#remove_NAfamily: TRUE if I want to remove OTUs that are not identified until family. See line 179.
+#remove_NAorders: TRUE if I want to remove MOTUs that are not identified until order. See line 168.
+#remove_NAfamily: TRUE if I want to remove MOTUs that are not identified until family. See line 179.
 #desired_species: species that I want to keep - uses species_code (first letter of genus in uppercase with first three letters of specific epithet in lowercase). See line 197.
 
-final_metbar <- function(data = NA, sample_list = NA, remove_samples=F,otus_clean=T,keep_class=c("Arachnida","Insecta"),remove_NAorders=T,remove_NAfamily=F,desired_species=NULL){
+final_metbar <- function(data = NA, sample_list = NA, remove_samples=F,otus_clean=1, keep_class=c("Arachnida","Insecta"),remove_NAorders=T,remove_NAfamily=F,desired_species=NULL){
  
   #######ORGANISING AND CLEANING METABARCODING DATA#####################
   metbarc <- data #metabarcoding data
@@ -51,7 +51,6 @@ final_metbar <- function(data = NA, sample_list = NA, remove_samples=F,otus_clea
   
   ####Cleaning data 
   ##excluding samples that have less reads then the controls - using "Control" to get controls and selecting samples as all columns between 1st column and "ControlC1"
-  if(remove_samples==T){
     reads_samples <- colSums(subset(metbarc, select = c(names(metbarc[1:(which(colnames(metbarc)=="ControlC1")-1)]))))#selects columns between 1st and "ControlC1", and then gives total reads per  samples
     n_samples <- length(reads_samples)#number of samples
     reads_control <- colSums(subset(metbarc, select = c(grepl("Control" , names(metbarc)))))##grepl matches a regular expression to a target. Getting total reads per control
@@ -60,9 +59,11 @@ final_metbar <- function(data = NA, sample_list = NA, remove_samples=F,otus_clea
     reads_remove <- reads_samples[reads_samples < max(reads_control)]#samples to be removed
     samples_removed <-names(reads_remove)
     n_removed <- length(samples_removed)#number of samples that were removed
-    barplot(sort(reads_samples),ylim = c(0, 2*max(reads_control)),xlab=paste("total samples:",n_samples,";","samples removed:",n_removed),ylab = "number of reads")
+    barplot(sort(reads_samples),ylim = c(0, 2*max(reads_control)),xlab=paste("total n of samples:",n_samples,";","samples to be removed:",n_removed),ylab = "number of reads")
     abline(h=max(reads_control),col="red")# you can choose a more proper value based on the plot if you think you're removing to much samples
     
+    if(remove_samples==T){
+      
     metbarc_clean <- subset(metbarc, select = setdiff(names(metbarc), samples_removed))
     
   } else {
@@ -108,7 +109,7 @@ final_metbar <- function(data = NA, sample_list = NA, remove_samples=F,otus_clea
   
   library(dplyr)
   links_order <- links_otu%>%
-    select (predator,prey,weight,phylum,class,order,family,genus,species)%>%
+    select(c(predator,prey,weight,phylum,class,order,family,genus,species))%>%
     rename(otu_phylum=phylum,otu_class=class,otu_order=order,otu_family=family,otu_genus=genus,otu_species=species)
   
   head(links_order)
@@ -140,10 +141,12 @@ final_metbar <- function(data = NA, sample_list = NA, remove_samples=F,otus_clea
   dim(links_propor)
   
     #if true only keeps rows with more than 1% of reads
-  if(otus_clean==T){
-    links_clean <- subset(links_propor, proportion >= 0.01)
-  } else {
+  if(otus_clean==0){
     links_clean <- links_propor
+  }else if(otus_clean>5){
+    stop("Threshold to high (only values from 0 to 5 are accepted)", call. = FALSE) 
+  } else {
+    links_clean <- subset(links_propor, proportion >= (otus_clean/100))
   }
   dim(links_clean)
   head(links_clean)
