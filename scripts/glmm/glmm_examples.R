@@ -52,7 +52,7 @@ zbj_data_order<-merge(zbj_data_order,zbj_total,by="predator")
 # casting dataframe into matrix predator x prey
 data_recast<-dcast(zbj_data_order, formula=predator+manage+total_reads+landscape~otu_order,value.var = "sum_weight")
 
-## i. For occurrence models
+## For occurrence models
 # converting NAs into 0  and >1 into 1 for presence absence
 data_occurrence<-data_recast 
 data_occurrence[,5:ncol(data_occurrence)] <- data_occurrence[,5:ncol(data_occurrence)] %>% dplyr::mutate(replace(., is.na(.), 0))
@@ -68,7 +68,7 @@ occurrence_grouped<- data_occurrence %>%
 
 ### 2. GENERALISED LINEAR MODELS
 
-## FOO: Frequency of occurrence (number of individuals with certain OTU present in diet)
+## EXAMPLE 1: FOO (Frequency of occurrence; number of individuals with certain OTU present in diet)
 mod_foo<-glm(Coleoptera ~ manage + landscape, family = "poisson", data = occurrence_grouped)
 summary(mod_foo) #the summary shows that landscape has an effect on FOO of Lepidotera, with landscape 'Bokito' having highest FOO, followed by 'Ayos' (baseline) and finally 'Konye'  
 DHARMa::testOverdispersion(mod_foo) #not overdispersed so Poisson is ok
@@ -76,7 +76,7 @@ DHARMa::testOverdispersion(mod_foo) #not overdispersed so Poisson is ok
 plot(occurrence_grouped$Coleoptera~occurrence_grouped$landscape)
 plot(occurrence_grouped$Coleoptera~occurrence_grouped$manage)
 
-## %FOO: % Frequency of occurrence (proportion of individuals with certain OTU present in diet)
+## EXAMPLE 2: %FOO (% Frequency of occurrence; proportion of individuals with certain OTU present in diet)
 mod_percfoo<-glm(cbind(Coleoptera,sample_n) ~ manage + landscape, family = "binomial", data = occurrence_grouped)
 summary(mod_percfoo) #here the summary indicates that neither landscape or management significantly affect %FOO of OTU_6
 DHARMa::testDispersion(mod_percfoo) # no overdispersion
@@ -84,7 +84,7 @@ DHARMa::testDispersion(mod_percfoo) # no overdispersion
 plot((occurrence_grouped$Coleoptera/occurrence_grouped$sample_n)~occurrence_grouped$landscape)
 plot((occurrence_grouped$Coleoptera/occurrence_grouped$sample_n)~occurrence_grouped$manage)
 
-## Weighted Occurrence: number of detected MOTUs corresponding to the target prey group divided by the total number of MOTUs detected in each individual
+## EXAMPLE 3: Weighted Occurrence (number of detected MOTUs corresponding to the target prey group divided by the total number of MOTUs detected in each individual)
 # first, we need to filter dataframe to select only Coleoptera rows
 col_data_order<- zbj_data_order %>%
   filter(otu_order=="Coleoptera")
@@ -97,7 +97,7 @@ DHARMa::testDispersion(mod_wocc) #test shows underdispersion?
 plot((col_data_order$order_otus/col_data_order$total_otus)~col_data_order$landscape)
 plot((col_data_order$order_otus/col_data_order$total_otus)~col_data_order$manage)
 
-## RRA: Relative Read Abundance (proportion of reads represented by certain OTU or OTU group)
+## EXAMPLE 4: RRA (Relative Read Abundance; proportion of reads represented by certain OTU or OTU group)
 mod_rra<-glm(cbind(sum_weight,total_reads) ~ manage + landscape, family = "binomial", data = col_data_order)
 summary(mod_rra)
 DHARMa::testDispersion(mod_rra) # not overdispersed
@@ -105,7 +105,7 @@ DHARMa::testDispersion(mod_rra) # not overdispersed
 plot((col_data_order$sum_weight/col_data_order$total_reads)~col_data_order$landscape)
 plot((col_data_order$sum_weight/col_data_order$total_reads)~col_data_order$manage)
 
-## Number of reads
+## EXAMPLE 5: Number of reads
 mod_reads<-glm(sum_weight ~ manage + landscape, family = "poisson", data = col_data_order)
 summary(mod_reads)
 DHARMa::testDispersion(mod_reads) #data very overdispersed, so try negative binomial family
