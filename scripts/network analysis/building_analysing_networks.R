@@ -22,14 +22,14 @@ head(samples_list)
 ###Reading function that returns final data frame with all data organized and cleaned - see organise&clean_metabarcoding.r for more details
 source('scripts/organize&clean_metabarcoding.r')
 
-zbj_data <- final_metbar(data = zbj,sample_list = samples_list, remove_samples=F,otus_clean=1, keep_class=NULL,remove_NAorders=T,remove_NAfamily=F,desired_species=NULL)
+zbj_data <- final_metbar(data = zbj,sample_list = samples_list, remove_samples=F,otus_clean=0, keep_class=NULL,remove_NAorders=F,remove_NAfamily=F,desired_species=NULL)
 head(zbj_data)
 dim(zbj_data)
-#403 rows and 18 columns
+#6426 rows and 18 columns
 n_distinct(zbj_data$prey)#number of different otus
-#196
+#3099
 n_distinct(zbj_data$predator)#number of samples - originally 224 samples 
-#166
+#220
 
 
 ####aggregate data by site and species
