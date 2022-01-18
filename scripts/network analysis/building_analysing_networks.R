@@ -8,8 +8,9 @@
 ###################################################
 
 ###importing metabarcoding data 
-#zbj primer: 224 samples and 3105 unique OTUS
-zbj <- read.csv2("data/16Farms_OTU_Table_withConfidence.csv", dec = ".", row.names = 1,header = TRUE, check.names=FALSE,na.strings=c("NA", "NULL", "", ".")) 
+#zbj primer: 224 samples, 2 controls and 2889 unique OTUS
+zbj <- read.csv2("data/16Farms_OTU_Table_vsearch.csv", dec = ".", row.names = 1,header = TRUE, check.names=FALSE,na.strings=c("NA", "NULL", "", ".")) 
+dim(zbj)
 colnames(zbj)
 head(zbj)
 
@@ -22,14 +23,16 @@ head(samples_list)
 ###Reading function that returns final data frame with all data organized and cleaned - see organise&clean_metabarcoding.r for more details
 source('scripts/organize&clean_metabarcoding.r')
 
-zbj_data <- final_metbar(data = zbj,sample_list = samples_list, remove_samples=F,otus_clean=0, keep_class=NULL,remove_NAorders=F,remove_NAfamily=F,desired_species=NULL)
+unique(zbj$class)
+#remove all OTUs that represent less than 1%, keeping onky Arachnida and Insecta, and remove OTUs not identified until order
+zbj_data <- final_metbar(data = zbj,sample_list = samples_list, remove_samples=F,otus_clean=1, keep_class=c("Arachnida","Insecta"),remove_NAorders=T,remove_NAfamily=F,desired_species=NULL)
 head(zbj_data)
 dim(zbj_data)
-#6426 rows and 18 columns
+#1499 rows and 18 columns
 n_distinct(zbj_data$prey)#number of different otus
-#3099
-n_distinct(zbj_data$predator)#number of samples - originally 224 samples 
-#220
+#816
+n_distinct(zbj_data$predator)#number of samples 
+#214
 
 
 ####aggregate data by site and species
@@ -56,7 +59,7 @@ write.csv(zbj_species,"outputs/results/network analysis/n_samples_network_zbj.cs
 ##I'll remove species that have less than 5 samples (ideally higher the cut-off the better) per landscape 
 species_remove_zbj <- unique(zbj_species[zbj_species$samples < 5, ])
 levels(as.factor(species_remove_zbj$predator))
-#I need to remove 5 species
+#I need to remove 3 species
 
 zbj_filtered <- data.frame()
 for (i in 1:length(unique(zbj_aggr$landscape))){
@@ -67,40 +70,40 @@ for (i in 1:length(unique(zbj_aggr$landscape))){
 }
 head(zbj_filtered)
 dim(zbj_filtered)
-#339 rows and 7 columns
+#1162 rows and 7 columns
 levels(as.factor(zbj_filtered$predator))
-#9 species
+#8 species
 
-########################Bipartite networkt - on bipartite package#################
+##############Bipartite networkt - on bipartite package##############
 ####generating an network based on a adjacency matrix and creating an each network based on webID /farm for now)
-#if I want to generate networks for each site and season, I need to change webID and add "paste(zbj_filtered$farm,zbj_filtered$season,sep="-")" to webID
+#if you want to generate networks for other variables (e.g., season), you need to change webID
 library(bipartite)
 zbj_nets <- frame2webs(data.frame(lower=zbj_filtered$prey,higher=zbj_filtered$predator,webID=zbj_filtered$landscape,freq=zbj_filtered$freq_otus),type.out="list")
 lapply(zbj_nets, dim)#checking dimensions of all data frames
 
 unlist(lapply(zbj_nets, function(x) sum(x>=1)))#number of links per network
 #Ayos Bokito  Konye 
-#182    121    154 
+#387   427     348 
 
 unlist(lapply(zbj_nets, sum))#total otus frequency per network
 #Ayos Bokito  Konye 
-#191    202    179 
+#411    634    401 
 
 unlist(lapply(zbj_nets, nrow))#number of otus per network
 #Ayos Bokito  Konye 
-#162    106    122 
+#330    332    280 
 
 unlist(lapply(zbj_nets, ncol))#number of species per network
 #Ayos Bokito  Konye 
-#7      4      8 
+#6      5      7 
 
 #####This tiny chunk shows how many MOTU are shared between networks
 samples <- lapply(zbj_nets, rownames)
 Reduce(intersect, samples)
 length(Reduce(intersect, samples))
-#18 otus shared
+#36 otus shared
 (length(Reduce(intersect, samples))/length(unique(zbj_filtered$prey)))*100
-#6.020067% of otus are shared between all networks
+#4.528302% of otus are shared between all networks
 
 ####Plotting bipartite network
 ##creating pallete (28 colours and colorblind) to give to each arthrpod order

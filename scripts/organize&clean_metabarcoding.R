@@ -30,7 +30,7 @@
 ##INPUT: function to read, organize and clean metabarcoding data from pipeline by Rachel et al. Needs Metabarcoding data and 
 #data: metabarcoding data with samples starting with a "X" and control with "Control". 
 #samples: sample_list with species information for each sample in data (lab.nbr,year,season,landscape,farm,species,species_code,animal). See line 117.
-#remove_samples: TRUE if you want to remove samples that have less reads then the controls. Using using "Control" to identify control columns. See line 54.
+#remove_samples: TRUE if you want to remove samples that have less reads then the controls. Using "Control" to identify control columns. See line 54.
 #otus_clean: 0 to 5 if you want to exclude MOTUs with less than 0% to 5% of total number of reads per sample. Default is 1 for 1% (e.g. add 0.01 for 0.01%). Values above 5 return error. See line 144.
 #keep_class: only keeping targeted taxonomic classes (default is c("Arachnida","Insecta")). If NULL keeps all classes. See line 157.
 #remove_NAorders: TRUE if I want to remove MOTUs that are not identified until order. See line 168.
@@ -40,7 +40,7 @@
 final_metbar <- function(data = NA, sample_list = NA, remove_samples=F,otus_clean=1, keep_class=c("Arachnida","Insecta"),remove_NAorders=T,remove_NAfamily=F,desired_species=NULL){
  
   #######ORGANISING AND CLEANING METABARCODING DATA#####################
-  metbarc <- data #metabarcoding data
+  metbarc <- zbj #metabarcoding data
   class(metbarc)
   #glimpse(metbarc)
   
@@ -50,8 +50,8 @@ final_metbar <- function(data = NA, sample_list = NA, remove_samples=F,otus_clea
   colnames(metbarc)
   
   ####Cleaning data 
-  ##excluding samples that have less reads then the controls - using "Control" to get controls and selecting samples as all columns between 1st column and "ControlC1"
-    reads_samples <- colSums(subset(metbarc, select = c(names(metbarc[1:(which(colnames(metbarc)=="ControlC1")-1)]))))#selects columns between 1st and "ControlC1", and then gives total reads per  samples
+  ##excluding samples that have less reads then the controls - using "Control" to get controls and selecting samples as all columns between 1st column and 1st column with "Control"
+    reads_samples <- colSums(subset(metbarc, select = c(names(metbarc[1:(which(grepl("Control" , names(metbarc)))[1]-1)]))))#selects columns between 1st and 1st column with "Control", and then gives total reads per  samples
     n_samples <- length(reads_samples)#number of samples
     reads_control <- colSums(subset(metbarc, select = c(grepl("Control" , names(metbarc)))))##grepl matches a regular expression to a target. Getting total reads per control
     reads_control#controls and its number of reads
@@ -73,7 +73,7 @@ final_metbar <- function(data = NA, sample_list = NA, remove_samples=F,otus_clea
   dim(metbarc_clean)
   
   ##ditching non-samples columns and the columns representing control samples
-  metbarc_clean1 <- subset(metbarc_clean, select = c(names(metbarc_clean[1:(which(colnames(metbarc_clean)=="ControlC1")-1)])))#selects columns 1st and "ControlC1"
+  metbarc_clean1 <- subset(metbarc_clean, select = c(names(metbarc_clean[1:(which(grepl("Control" , names(metbarc)))[1]-1)])))#selects columns 1st and "ControlC1"
   dim(metbarc_clean1)
   
   
