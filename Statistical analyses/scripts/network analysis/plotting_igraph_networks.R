@@ -1,87 +1,97 @@
 ##################################################
-## Project: bats and networks
-## Script purpose: plotting igraph network - igraph package
-## Date: 05/01/2021
+## Project: metabarcoding and networks
+## Script purpose: creating and plotting with igraph 
+## Date: 10/09/2021
 ## Author: Diogo F. Ferreira (ferreiradfa@gmail.com)
-## Notes:
+## Packages: igraph, qgraph and RColorBrewer
+## Notes: you will need the function to generate_final_data.r to run this script
 ###################################################
 
 ###importing metabarcoding data 
-#zbj primer - most otus of targeted classes (14301 out of 14927) - I have to remove 49 samples due to controls - 269 samples - For Insecta and Arachnida after cleaning and removing: 309 otus to order of 895, and 232 to family.
-zbj <- read.csv("data/Metabarcoding/MiSeq1&MiSeq2_16 farms_13April2020/zbj_consensus.tsv", sep = "\t",row.names = 1,header = TRUE, na.strings=c("NA", "NULL", "", ".")) 
+#zbj primer: 224 samples, 2 controls and 2889 unique OTUS
+zbj <- read.csv2("data/16Farms_OTU_Table_vsearch.csv", dec = ".", row.names = 1,header = TRUE, check.names=FALSE,na.strings=c("NA", "NULL", "", ".")) 
+dim(zbj)
+colnames(zbj)
+head(zbj)
 
-#####using zbj - more data overall
-###Reading my function that returns final data frame with all data organised and cleaned - see generate_final_data.r for more details
-source('scripts/generate_final_data.r')
+###importing species information for each sample
+library(openxlsx)#read excel and sheet
+samples_list <- read.xlsx("data/faeces_sample_database.xlsx", sheet = "samples")
+colnames(samples_list)
+head(samples_list)
 
-met_data <- function(met){
-  final_metbar(data = met,remove_samples=T,otus_clean=T,keep_class=c("Arachnida","Insecta"),remove_NAorders=T,remove_NAfamily=F,desired_species=NULL)
-}
+###Reading function that returns final data frame with all data organized and cleaned - see organise&clean_metabarcoding.r for more details
+source('scripts/organize&clean_metabarcoding.r')
 
-
-zbj_data <- met_data(zbj)
+unique(zbj$class)
+#remove all OTUs that represent less than 1%, keeping onky Arachnida and Insecta, and remove OTUs not identified until order
+zbj_data <- final_metbar(data = zbj,sample_list = samples_list, remove_samples=F,otus_clean=1, keep_class=c("Arachnida","Insecta"),remove_NAorders=T,remove_NAfamily=F,desired_species=NULL)
 head(zbj_data)
 dim(zbj_data)
+#1499 rows and 18 columns
 n_distinct(zbj_data$prey)#number of different otus
-#309
-n_distinct(zbj_data$predator)#number of samples
-#219
+#816
+n_distinct(zbj_data$predator)#number of samples 
+#214
 
-####aggregate data by site and species - keeping only bats and insectivores
-met_aggr <- function(met){
-  met %>%
-    filter(animal == "bat")%>%
-    group_by(predator=species,prey,otu_order,pest,landscape,farm)%>%
-    summarise(weight=sum(weight),proportion=mean(proportion),freq_otus=n())
-}
 
-zbj_aggr <- met_aggr(zbj_data)
+####aggregate data by site and species
+colnames(zbj_data)#keeping only species, prey, otu_order, landscape, weight, proportion and creating column for otu frequency
+zbj_aggr <- zbj_data %>%
+  group_by(predator=species_code,prey,otu_order,landscape)%>%
+  summarise(weight=sum(weight),proportion=mean(proportion),freq_otus=n())
 head(zbj_aggr)
 dim(zbj_aggr)
-levels(as.factor(zbj_aggr$predator))
-#21 species
+#1214 rows and 7 columns
+levels(as.factor(zbj_aggr$predator))#check how and what bats/bird species I have
+#11 
 
 ####Creating data frame (nodes list) with frequency and abundance of all bat and bird species plus otus 
-###importing bird capture data - I am nothing use birds for now but it will be useful for latter
-birds <- read.xlsx("data/BirdBandingDataAll_19Oct20.xlsx", sheet = "capdata")
-head(birds)
+###edge list
+##predators - insects
+##how many times each otu occurred per predator species
+pred_ins <- zbj_aggr %>%
+  group_by(Source=predator,Target=prey,landscape)%>%
+  summarise(Weight=sum(freq_otus))
+head(pred_ins)
 
-birds$season <- ifelse(birds$month > 6, "wet", "dry")#add column for season 
-birds$taxon <- "bird" #new columns to identify type of animal
+##checking how many samples per species
+samples_sp <- zbj_data %>%
+  group_by("Source"=species_code,landscape)%>%
+  summarise(samples = n_distinct(predator))
+head(samples_sp)
 
-#bird abundance per site and season
-birds_abun <- birds %>%
-  group_by(id=species,taxon,landscape,farm) %>%
+##standardizing samples by bat species where I have that otu
+pred_ins_std <- merge(pred_ins, samples_sp, by = c("Source","landscape"))
+head(pred_ins_std)
+
+pred_ins_std$Weight_std <- pred_ins_std$Weight/pred_ins_std$samples*100
+head(pred_ins_std)
+
+edge_final <- pred_ins_std%>%
+  select(Source,Target,"weight"=Weight_std,landscape)
+head(edge_final)
+
+###node list
+##importing capture data
+captures <- read.csv("data/bird_and_bat_capturedata.csv",sep = ";")
+head(captures)
+
+#captures per landscape
+all_abun <- captures %>%
+  group_by(id=code,taxon,landscape) %>%
   summarize(count = n())
-head(birds_abun)
+head(all_abun)
 
-###importing bat capture data
-bats <- read.xlsx("data/BatCaptureData_Cameroon__20Dec07.xlsx", sheet = "Captures")
-head(bats)
-
-#matching column names with birds capture data
-names(bats)<-tolower(names(bats))#all column names to lowercase
-bats$season<-tolower(bats$season)#season needs to be in lower case
-names(bats)[names(bats) == "site"] <- "farm"
-names(bats)[names(bats) == "location"] <- "landscape"
-
-bats$taxon <- "bat"#new columns to identify type of animal
-
-#bat abundance per site and season
-bats_abun <- bats %>%
-  group_by(id=species,taxon,landscape,farm) %>%
-  summarize(count = n())
-head(bats_abun)
-
-###calculating otus frequency per site and season
+###calculating otus frequency per landscape
 #only makes sense if I have the same number of samples per site (not the case, at least for now). It will always be correlated with number of samples per site
 otus_freq <- zbj_aggr %>%
-  group_by(id=prey,taxon=otu_order,landscape,farm)%>%
+  group_by(id=prey,taxon=otu_order,landscape)%>%
   summarise(count=sum(freq_otus))#ideally I should have data for the abundance of insects (check Cyril data in the future)
 head(otus_freq)
 
 ###join predators abundance and otus frequency
-nodes_count <- rbind(birds_abun,bats_abun,otus_freq)
+nodes_count <- rbind(all_abun,otus_freq)
 head(nodes_count)
 dim(nodes_count)
 
@@ -90,21 +100,11 @@ nodes_count$type <- ifelse(grepl("OTU" , nodes_count$id),"prey","predator")# col
 head(nodes_count)
 dim(nodes_count)
 
-###selecting only nodes that are present in my samples - doesn't work super well because I have nodes that only occur in a farm
+###selecting only nodes that are present in my samples (just in case we capture species but do not have samples)
 nodes_network <- c(unique(zbj_aggr$predator), unique(zbj_aggr$prey))
 nodes_final <- nodes_count[nodes_count$id %in% nodes_network,]
 head(nodes_final)
 dim(nodes_final)
-
-write.csv(nodes_final,"outputs/data/gephi_nodelist_zbj.csv",row.names = FALSE)
-
-####creating the edge list
-edge_final <- zbj_aggr %>%
-  ungroup()%>%
-  select(Source=predator,Target=prey,"weight"=freq_otus,landscape,farm)
-head(edge_final)
-
-write.csv(edge_final,"outputs/data/gephi_edgelist_zbj.csv",row.names = FALSE)
 
 ####To generate a list with a igraph network for each site and then for plotting it
 library(igraph)
@@ -112,54 +112,61 @@ library(qgraph)
 
 igraph_list <- list()#creating empty list
 
-farms <- unique(zbj_aggr$farm)# names of all farms
-print(farms)
+landscape <- unique(zbj_aggr$landscape)# names of all landscape
+print(landscape)
 
-for(i in 1:length(farms)){
-  edge_list <- edge_final[which(edge_final$farm==farms[i]),]
+for(i in 1:length(landscape)){
+  edge_list <- edge_final[which(edge_final$landscape==landscape[i]),]
   nodes <- unique(data.frame(id = c(pull(edge_list,colnames(edge_list[1])),pull(edge_list,colnames(edge_list[2])))))###nodes list contains all unique otus and predators ID
-  nodes_info <- nodes_final[which(nodes_final$farm==farms[i]),]
+  nodes_info <- nodes_final[which(nodes_final$landscape==landscape[i]),]
   nodes_list <- merge(nodes, nodes_info, by=c("id"))#merging nodes with nodes_count;
   nodes_list <- nodes_list[order(nodes_list$type),]
   network <- graph_from_data_frame(d=edge_list, vertices=nodes_list, directed=F)#creating an igraph object based on the node and edge lists; In igraph a bipartite network is one that has a type vertex attribute; The 'B' letter after "UNW" tells you that this is a bipartite graph
   igraph_list[[i]] <- network
 }
 
-names(igraph_list) <- farms#matching data.frames names to farms
+names(igraph_list) <- landscape #matching data.frames names to landscape
 names(igraph_list)
 
-##Exploring igraph - I'll have then to create a loop to apply everything to igraph_lisy
-nets_igraph <- igraph_list$NGUI002
+##Exploring igraph - doing an example for Bokito landscape
+nets_igraph <- igraph_list$Bokito
 class(nets_igraph)
 nets_igraph
 
-# Count number of edges
+#Count number of edges
 gsize(nets_igraph)
-# Count number of vertices
+#427
+
+#Count number of vertices
 gorder(nets_igraph)
-# View attributes of first five vertices in a dataframe
+#337
+
+#View attributes of first five vertices in a dataframe
 V(nets_igraph)[[1:5]] 
+
+#View attributes of first five edges in a dataframe
 E(nets_igraph)[[1:5]] 
 
 ##plotting 
-# Set node shapes by type
+#Set node shapes by type
 V(nets_igraph)$shape <- V(nets_igraph)$type
 V(nets_igraph)$shape <- gsub("predator","circle",V(nets_igraph)$shape)
 V(nets_igraph)$shape <- gsub("prey","square",V(nets_igraph)$shape)
 
-#Set link colors by pest or not pest
-#E(nets_igraph)$color <- E(nets_igraph)$pest
-#E(nets_igraph)$color <- gsub("no","#D05B9B",E(nets_igraph)$color)
-#E(nets_igraph)$color <- gsub("yes","#5770AE",E(nets_igraph)$color)
+#if we had another variable we could change colors of edges - for example by season
+#E(nets_igraph)$color <- E(nets_igraph)$season
+#E(nets_igraph)$color <- gsub("wet","#D05B9B",E(nets_igraph)$color)
+#E(nets_igraph)$color <- gsub("dry","#5770AE",E(nets_igraph)$color)
 
 #Set nodes colours by taxon
 library("RColorBrewer")
 taxa <- unique(V(nets_igraph)$taxon)#insect orders plus predator 
-col <- brewer.pal(n = length(taxa), name = "RdBu")#one different colour for each order
+col <- brewer.pal(n = length(taxa), name = "RdBu")#one different color for each order
 V(nets_igraph)$color <- V(nets_igraph)$taxon
 
-#V(nets_igraph)$taxon <- gsub("bat","Bat", V(nets_igraph)$taxon)
-#V(nets_igraph)$taxon <- gsub("bird","Bird",V(nets_igraph)$taxon)
+#renaming taxon
+V(nets_igraph)$taxon <- gsub("bat","Bat", V(nets_igraph)$taxon)
+
 
 #replacing order by the specific colour
 for(i in 1:length(taxa)){
@@ -167,17 +174,8 @@ for(i in 1:length(taxa)){
 }
 
 ###creating layouts for plot
-#position of nodes for the plot - similar to plotweb
-animal <- table(V(nets_igraph)$type)
-animal
-position <- matrix(c(c(1:animal[1],1:animal[2]),rep(1:2,c(animal[1],animal[2]))),ncol=2,nrow=gorder(nets_igraph))#could also use  sum(animal)
-
-#or I can use the layout layout=layout_as_bipartite() - although doesn't work always
-bipartite <- layout.bipartite(nets_igraph)# doesn't work - don't know why
-
-#other layouts
-l <- layout_nicely(nets_igraph)#if I want another shape for the plot
-
+l <- layout_nicely(nets_igraph)#a common layout for nodes
+#or
 e <- get.edgelist(nets_igraph,names=FALSE)
 lnodes <- qgraph.layout.fruchtermanreingold(e,vcount=vcount(nets_igraph))#avoids overlapping nodes
 
@@ -185,7 +183,7 @@ lnodes <- qgraph.layout.fruchtermanreingold(e,vcount=vcount(nets_igraph))#avoids
 curvesG <- curve_multiple(nets_igraph)
 
 ###Plotting igraph object
-png(filename="outputs/plots/network_ngui2.png",res= 300, height= 3000, width= 3500)
+png(filename="outputs/plots/igraph_network_bokito.png",res= 300, height= 3000, width= 3500)
 
 plot(nets_igraph, 
      vertex.color = V(nets_igraph)$color, 
@@ -198,29 +196,19 @@ plot(nets_igraph,
      edge.color = E(nets_igraph)$color,
      edge.width = log(E(nets_igraph)$weight),
      edge.curved=curvesG,
-     layout=lnodes)#I can also use "l" or "position"
+     layout=lnodes)#I can also use "l" 
 
 ##I need to redo this - Create a legend for the plot 
-legend(x = 1.05,
-       y = 1, 
-       legend = c("Prey","Predator"), 
-       pch = c(15,16),  
-       title="Taxa", 
-       text.col = "gray20", 
-       title.col = "black", 
-       box.lwd = 0,
-       cex = 1.5,
-       bty ="n")
 legend(x = 1,
-       y = 0.65, 
+       y = 0.5, 
        legend = unique(V(nets_igraph)$taxon),
        fill = unique(V(nets_igraph)$color), 
        title="Taxon",
        text.col = "gray20", 
        title.col = "black", 
        box.lwd = 0, 
-       cex = 1.5,
+       cex = 1,
        bty ="n")
-title(main = "Arthropd-Predator network - NGUI2", cex.main=2)
+title(main = "Arthropd-Predator network - Bokito", cex.main=2)
 
-dev.off()#clear all plots and savin last plot
+dev.off()#clear all plots and saving last plot

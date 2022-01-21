@@ -35,14 +35,14 @@ n_distinct(zbj_data$predator)#number of samples
 #214
 
 
-####aggregate data by site and species
+####aggregate data by landscape and species
 colnames(zbj_data)#keeping only species, prey, otu_order, landscape, weight, proportion and creating column for otu frequency
 zbj_aggr <- zbj_data %>%
     group_by(predator=species_code,prey,otu_order,landscape)%>%
     summarise(weight=sum(weight),proportion=mean(proportion),freq_otus=n())
 head(zbj_aggr)
 dim(zbj_aggr)
-#319 rows and 7 columns
+#1214 rows and 7 columns
 levels(as.factor(zbj_aggr$predator))#check how and what bats/bird species I have
 #11 
 
@@ -74,11 +74,18 @@ dim(zbj_filtered)
 levels(as.factor(zbj_filtered$predator))
 #8 species
 
+####standardizing links (edges) by number of samples
+data_network <- merge(zbj_filtered, zbj_species, by = c("predator","landscape"))
+head(data_network)
+
+data_network$weight_std <- data_network$freq_otus/data_network$samples*100
+head(data_network)
+
 ##############Bipartite networkt - on bipartite package##############
-####generating an network based on a adjacency matrix and creating an each network based on webID /farm for now)
+####generating an network based on a adjacency matrix and creating an each network based on landscape and using weight_std)
 #if you want to generate networks for other variables (e.g., season), you need to change webID
 library(bipartite)
-zbj_nets <- frame2webs(data.frame(lower=zbj_filtered$prey,higher=zbj_filtered$predator,webID=zbj_filtered$landscape,freq=zbj_filtered$freq_otus),type.out="list")
+zbj_nets <- frame2webs(data.frame(lower=data_network$prey,higher=data_network$predator,webID=data_network$landscape,freq=data_network$weight_std),type.out="list")
 lapply(zbj_nets, dim)#checking dimensions of all data frames
 
 unlist(lapply(zbj_nets, function(x) sum(x>=1)))#number of links per network
@@ -86,8 +93,8 @@ unlist(lapply(zbj_nets, function(x) sum(x>=1)))#number of links per network
 #387   427     348 
 
 unlist(lapply(zbj_nets, sum))#total otus frequency per network
-#Ayos Bokito  Konye 
-#411    634    401 
+#Ayos         Bokito       Konye 
+#3787.143    4009.167    4589.346  
 
 unlist(lapply(zbj_nets, nrow))#number of otus per network
 #Ayos Bokito  Konye 
