@@ -40,7 +40,7 @@
 final_metbar <- function(data = NA, sample_list = NA, remove_samples=F,otus_clean=1, keep_class=c("Arachnida","Insecta"),remove_NAorders=T,remove_NAfamily=F,desired_species=NULL){
  
   #######ORGANISING AND CLEANING METABARCODING DATA#####################
-  metbarc <- zbj #metabarcoding data
+  metbarc <- data #metabarcoding data
   class(metbarc)
   #glimpse(metbarc)
   
