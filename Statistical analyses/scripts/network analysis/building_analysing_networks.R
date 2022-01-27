@@ -28,11 +28,11 @@ unique(zbj$class)
 zbj_data <- final_metbar(data = zbj,sample_list = samples_list, remove_samples=F,otus_clean=1, keep_class=c("Arachnida","Insecta"),remove_NAorders=T,remove_NAfamily=F,desired_species=NULL)
 head(zbj_data)
 dim(zbj_data)
-#1499 rows and 18 columns
+#1571 rows and 18 columns
 n_distinct(zbj_data$prey)#number of different otus
-#816
+#849
 n_distinct(zbj_data$predator)#number of samples 
-#214
+#218
 
 
 ####aggregate data by landscape and species
@@ -42,7 +42,7 @@ zbj_aggr <- zbj_data %>%
     summarise(weight=sum(weight),proportion=mean(proportion),freq_otus=n())
 head(zbj_aggr)
 dim(zbj_aggr)
-#1214 rows and 7 columns
+#1265 rows and 7 columns
 levels(as.factor(zbj_aggr$predator))#check how and what bats/bird species I have
 #11 
 
@@ -70,9 +70,9 @@ for (i in 1:length(unique(zbj_aggr$landscape))){
 }
 head(zbj_filtered)
 dim(zbj_filtered)
-#1162 rows and 7 columns
+#1227 rows and 7 columns
 levels(as.factor(zbj_filtered$predator))
-#8 species
+#9 species
 
 ####standardizing links (edges) by number of samples
 data_network <- merge(zbj_filtered, zbj_species, by = c("predator","landscape"))
@@ -90,27 +90,27 @@ lapply(zbj_nets, dim)#checking dimensions of all data frames
 
 unlist(lapply(zbj_nets, function(x) sum(x>=1)))#number of links per network
 #Ayos Bokito  Konye 
-#387   427     348 
+#401   453     373 
 
 unlist(lapply(zbj_nets, sum))#total otus frequency per network
 #Ayos         Bokito       Konye 
-#3787.143    4009.167    4589.346  
+#3937.143    4206.439    4951.661  
 
 unlist(lapply(zbj_nets, nrow))#number of otus per network
 #Ayos Bokito  Konye 
-#330    332    280 
+#339    351    298 
 
 unlist(lapply(zbj_nets, ncol))#number of species per network
 #Ayos Bokito  Konye 
-#6      5      7 
+#6      5      8 
 
 #####This tiny chunk shows how many MOTU are shared between networks
 samples <- lapply(zbj_nets, rownames)
 Reduce(intersect, samples)
 length(Reduce(intersect, samples))
-#36 otus shared
+#38 otus shared
 (length(Reduce(intersect, samples))/length(unique(zbj_filtered$prey)))*100
-#4.528302% of otus are shared between all networks
+#4.550898% of otus are shared between all networks
 
 ####Plotting bipartite network
 ##creating pallete (28 colours and colorblind) to give to each arthrpod order

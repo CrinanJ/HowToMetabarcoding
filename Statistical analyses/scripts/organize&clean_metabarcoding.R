@@ -31,13 +31,13 @@
 #data: metabarcoding data with samples starting with a "X" and control with "Control". 
 #samples: sample_list with species information for each sample in data (lab.nbr,year,season,landscape,farm,species,species_code,animal). See line 117.
 #remove_samples: TRUE if you want to remove samples that have less reads then the controls. Using "Control" to identify control columns. See line 54.
-#otus_clean: 0 to 5 if you want to exclude MOTUs with less than 0% to 5% of total number of reads per sample. Default is 1 for 1% (e.g. add 0.01 for 0.01%). Values above 5 return error. See line 144.
 #keep_class: only keeping targeted taxonomic classes (default is c("Arachnida","Insecta")). If NULL keeps all classes. See line 157.
+#otus_clean: 0 to 5 if you want to exclude MOTUs with less than 0% to 5% of total number of reads per sample. Default is 1 for 1% (e.g. add 0.01 for 0.01%). Values above 5 return error. See line 144.
 #remove_NAorders: TRUE if I want to remove MOTUs that are not identified until order. See line 168.
 #remove_NAfamily: TRUE if I want to remove MOTUs that are not identified until family. See line 179.
 #desired_species: species that I want to keep - uses species_code (first letter of genus in uppercase with first three letters of specific epithet in lowercase). See line 197.
 
-final_metbar <- function(data = NA, sample_list = NA, remove_samples=F,otus_clean=1, keep_class=c("Arachnida","Insecta"),remove_NAorders=T,remove_NAfamily=F,desired_species=NULL){
+final_metbar <- function(data = NA, sample_list = NA, remove_samples=F,keep_class=c("Arachnida","Insecta"),otus_clean=1,remove_NAorders=T,remove_NAfamily=F,desired_species=NULL){
  
   #######ORGANISING AND CLEANING METABARCODING DATA#####################
   metbarc <- data #metabarcoding data
@@ -127,12 +127,25 @@ final_metbar <- function(data = NA, sample_list = NA, remove_samples=F,otus_clea
   head(links_habitat)
   dim(links_habitat)
   
+  ##only want to keep relevant prey taxa - only want to keep Arthropoda:Arachnida and Insecta for now
+  levels(as.factor(links_habitat$otu_phylum))
+  levels(as.factor(links_habitat$otu_class))
+  
+  if(is.null(keep_class)){
+    links_clean <- links_habitat
+  } else{
+    links_clean <-links_habitat%>%
+      filter(otu_class %in% keep_class)#default c("Arachnida","Insecta") - this can be changed to include other classes
+  }
+  dim(links_clean)
+  head(links_clean)
+  
   
   ###Excluding otus with less than 1% of total number of reads per sample
   ##Creating column with proportion of otus per individual
   links_propor <- data.frame()
-  for (i in 1:length(unique(links_habitat$predator))){
-    id <- links_habitat[links_habitat$predator==unique(links_habitat$predator)[i],]#select linls from a specific individual
+  for (i in 1:length(unique(links_clean$predator))){
+    id <- links_clean[links_clean$predator==unique(links_clean$predator)[i],]#select linls from a specific individual
     id$total_reads <- sum(id$weight)#calculates total number of reads for that individual
     id$proportion <- id$weight/id$total_reads#calculates proportions
     links_propor <- rbind(links_propor, id)
@@ -142,24 +155,11 @@ final_metbar <- function(data = NA, sample_list = NA, remove_samples=F,otus_clea
   
     #if true only keeps rows with more than 1% of reads
   if(otus_clean==0){
-    links_clean <- links_propor
+    links_clean1 <- links_propor
   }else if(otus_clean>5){
     stop("Threshold to high (only values from 0 to 5 are accepted)", call. = FALSE) 
   } else {
-    links_clean <- subset(links_propor, proportion >= (otus_clean/100))
-  }
-  dim(links_clean)
-  head(links_clean)
-  
-  ##only want to keep relevant prey taxa - only want to keep Arthropoda:Arachnida and Insecta for now
-  levels(as.factor(links_clean$otu_phylum))
-  levels(as.factor(links_clean$otu_class))
-  
-  if(is.null(keep_class)){
-    links_clean1 <- links_clean
-  } else{
-    links_clean1 <-links_clean%>%
-      filter(otu_class %in% keep_class)#default c("Arachnida","Insecta") - this can be changed to include other classes
+    links_clean1 <- subset(links_propor, proportion >= (otus_clean/100))
   }
   dim(links_clean1)
   head(links_clean1)
