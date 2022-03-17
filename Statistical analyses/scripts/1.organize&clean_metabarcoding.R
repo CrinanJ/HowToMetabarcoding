@@ -1,54 +1,49 @@
 ##################################################
-## Project: metabarcoding and networks
+## Project: How to metabarcode (Rachel et al 2022)
 ## Script purpose: function to organizing and cleaning metabarcoding data for statistical analysis 
-## Date: 10/09/2021
+## Date: 17/03/2022
 ## Author: Diogo F. Ferreira (ferreiradfa@gmail.com)
 ## Packages: dplyr and reshape2  
-## Notes: to read everything more fluidly go to  Tools>Global Options>Code>check the box "Soft-wrap R source files"Apply)
+## Notes: to read everything more fluidly go to  Tools > Global Options> Code > check the box "Soft-wrap R source files" > Apply
 ###################################################
 
-##OUTPUT: function returns a plot with cutline to remove samples based on control reads and data frame with 19 columns: 
-  #prey: OTU number.
-  #predator: sample number.
-  #weight: number of reads.
-  #otu_phylum: OTU phylum.
-  #otu_class: OTU class.
-  #otu_order: OTU order.
-  #otu_family: OTU family.
-  #otu_genus: OTU genus.
-  #otu_species: OTU species.
-  #year: year when the sample was collected.
-  #season: season when the sample was collected.
-  #landscape: landscape where the sample was collected.
-  #farm: farm where the sample was collected.
-  #species: predator species names.
-  #species_code: predator species code (first letter of predator genus in uppercase with first three letters of specific epithet in lowercase).
-  #animal: if predator is a bird or bat.
-  #proportion: proportion of an OTU in a sample based on the number of reads.
-  #freq_farm: presence/absence of an OTU in a farm (e.g. for zbj maximum is 16).
-
-##INPUT: function to read, organize and clean metabarcoding data from pipeline by Rachel et al. Needs Metabarcoding data and 
-#data: metabarcoding data with samples starting with a "X" and control with "Control". 
-#samples: sample_list with species information for each sample in data (lab.nbr,year,season,landscape,farm,species,species_code,animal). See line 117.
-#remove_samples: TRUE if you want to remove samples that have less reads then the controls. Using "Control" to identify control columns. See line 54.
-#keep_class: only keeping targeted taxonomic classes (default is c("Arachnida","Insecta")). If NULL keeps all classes. See line 157.
-#otus_clean: 0 to 5 if you want to exclude MOTUs with less than 0% to 5% of total number of reads per sample. Default is 1 for 1% (e.g. add 0.01 for 0.01%). Values above 5 return error. See line 144.
-#remove_NAorders: TRUE if I want to remove MOTUs that are not identified until order. See line 168.
-#remove_NAfamily: TRUE if I want to remove MOTUs that are not identified until family. See line 179.
-#desired_species: species that I want to keep - uses species_code (first letter of genus in uppercase with first three letters of specific epithet in lowercase). See line 197.
+##OUTPUT: 
+  #function returns a plot with cut-line to remove samples based on control reads 
+  #data frame with 19 columns: 
+    #predator: sample number
+    #prey: OTU number
+    #weight: number of reads per OTU and sample
+    #otu_phylum: OTU phylum
+    #otu_class: OTU class
+    #otu_order: OTU order
+    #otu_family: OTU family
+    #otu_genus: OTU genus
+    #otu_species: OTU species.
+    #year: year when the sample was collected
+    #season: season when the sample was collected
+    #landscape: landscape where the sample was collected
+    #farm: farm where the sample was collected
+    #species: predator species name
+    #species_code: predator species code (first letter of predator genus in uppercase with first three letters of specific epithet in lowercase).
+    #animal: if predator is a bird or bat
+    #total_reads: total number of reads per sample
+    #proportion: proportion of an OTU in a sample based on the number of reads
+    
+##INPUT: function to read, organize and clean metabarcoding data from Rachel et al 2022. Needs Metabarcoding data (organised the same way) and information associated to samples 
+  #data: metabarcoding data with samples coming 1st and then controls with "Control" in the name
+  #samples: sample_list with species information for each sample in data (lab.nbr,year,season,landscape,farm,species,species_code,animal). See line 115
+  #remove_samples: TRUE if you want to remove samples that have less reads then the controls. Using "Control" to identify control columns. See line 49
+  #keep_class: only keeping targeted taxonomic classes (default is c("Arachnida","Insecta")). If NULL keeps all classes. See line 129
+  #otus_clean: 0 to 5 if you want to exclude OTUs with less than 0% to 5% of total number of reads per sample. Default is 1 for 1% (e.g. add 0.01 for 0.01%). Values above 5 return error. See line 141
+  #remove_NAorders: TRUE if I want to remove OTUs that are not identified to order. See line 163
+  #remove_NAfamily: TRUE if I want to remove OTUs that are not identified to family. See line 173
+  #desired_species: predator species that I want to keep - uses species_code (first letter of genus in uppercase with first three letters of specific epithet in lowercase). See line 183
 
 final_metbar <- function(data = NA, sample_list = NA, remove_samples=F,keep_class=c("Arachnida","Insecta"),otus_clean=1,remove_NAorders=T,remove_NAfamily=F,desired_species=NULL){
  
   #######ORGANISING AND CLEANING METABARCODING DATA#####################
   metbarc <- data #metabarcoding data
-  class(metbarc)
-  #glimpse(metbarc)
-  
-  #Check the data - rows are otus and numbers are samples
-  dim(metbarc)
-  rownames(metbarc)
-  colnames(metbarc)
-  
+ 
   ####Cleaning data 
   ##excluding samples that have less reads then the controls - using "Control" to get controls and selecting samples as all columns between 1st column and 1st column with "Control"
     reads_samples <- colSums(subset(metbarc, select = c(names(metbarc[1:(which(grepl("Control" , names(metbarc)))[1]-1)]))))#selects columns between 1st and 1st column with "Control", and then gives total reads per  samples
@@ -73,7 +68,7 @@ final_metbar <- function(data = NA, sample_list = NA, remove_samples=F,keep_clas
   dim(metbarc_clean)
   
   ##ditching non-samples columns and the columns representing control samples
-  metbarc_clean1 <- subset(metbarc_clean, select = c(names(metbarc_clean[1:(which(grepl("Control" , names(metbarc)))[1]-1)])))#selects columns 1st and "ControlC1"
+  metbarc_clean1 <- subset(metbarc_clean, select = c(names(metbarc_clean[1:(which(grepl("Control" , names(metbarc)))[1]-1)])))#selects columns until "ControlC1"
   dim(metbarc_clean1)
   
   
@@ -116,7 +111,7 @@ final_metbar <- function(data = NA, sample_list = NA, remove_samples=F,keep_clas
   dim(links_order)
  
   ####Merging metabarcoding data with species and habitat data
-  ###importing database with feaces samples ID
+  ###importing database with feces sample ID
   samples <<- sample_list 
   
   ###merging habitat data and species ID with metabarcoding data
@@ -141,19 +136,19 @@ final_metbar <- function(data = NA, sample_list = NA, remove_samples=F,keep_clas
   head(links_clean)
   
   
-  ###Excluding otus with less than 1% of total number of reads per sample
+  ###Excluding otus with less than x% of total number of reads per sample
   ##Creating column with proportion of otus per individual
   links_propor <- data.frame()
   for (i in 1:length(unique(links_clean$predator))){
-    id <- links_clean[links_clean$predator==unique(links_clean$predator)[i],]#select linls from a specific individual
-    id$total_reads <- sum(id$weight)#calculates total number of reads for that individual
+    id <- links_clean[links_clean$predator==unique(links_clean$predator)[i],]#select links from a specific sample
+    id$total_reads <- sum(id$weight)#calculates total number of reads for that sample
     id$proportion <- id$weight/id$total_reads#calculates proportions
     links_propor <- rbind(links_propor, id)
   } 
   head(links_propor)
   dim(links_propor)
   
-    #if true only keeps rows with more than 1% of reads
+    #if true only keeps rows with more than x% of reads
   if(otus_clean==0){
     links_clean1 <- links_propor
   }else if(otus_clean>5){
@@ -189,7 +184,7 @@ final_metbar <- function(data = NA, sample_list = NA, remove_samples=F,keep_clas
     links_filter <- links_clean3
   } else{
     links_filter <- links_clean3%>%
-    filter(species%in%desired_species)#e.g. c("Hipposideros ruber")
+    filter(species_code%in%desired_species)#e.g. c("Hipposideros ruber")
   }
   head(links_filter)
   dim(links_filter)

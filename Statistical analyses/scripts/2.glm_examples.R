@@ -1,13 +1,17 @@
-#' ---
-#' title: Examples of GLMs with diet metabarcoding data
-#' author: Crinan Jarrett
-#' date: 21 Jan 2022
-#' ---
- 
+##################################################
+## Project: How to metabarcode (Rachel et al 2022)
+## Script purpose: Examples of GLMs with diet metabarcoding data 
+## Date: 21/01/2022
+## Author: Crinan Jarrett (crinan.jarrett@gmail.com )
+## Packages: lme4, reshape2, DHARMa, MASS and openxlsx 
+## Notes: you will need the function to generate_final_data.r to run this script 
+###################################################
+
 library(lme4)
 library(reshape2)
 library(DHARMa)
 library(MASS)
+library(openxlsx)
 
 ## Scenario: faecal samples from bats in 4 different landscapes and on a gradient of management
 ## Explanatory variables: Management (continuous) and Landscape (categorical)
@@ -17,12 +21,12 @@ library(MASS)
 zbj <- read.csv2("data/16Farms_OTU_Table_vsearch.csv", dec = ".", row.names = 1,header = TRUE, check.names=FALSE,na.strings=c("NA", "NULL", "", ".")) 
 
 # importing species information for each sample
-library(openxlsx)#read excel and sheet
 samples_list <- read.xlsx("data/faeces_sample_database.xlsx", sheet = "samples")
 
 # Reading function that returns final data frame with all data organized and cleaned - see organize&clean_metabarcoding.r for more details
 source('scripts/organize&clean_metabarcoding.r')
 zbj_data <- final_metbar(data = zbj,sample_list = samples_list, remove_samples=F,otus_clean=1, keep_class=c("Arachnida","Insecta"),remove_NAorders=T,remove_NAfamily=F,desired_species=NULL)
+
 zbj_data$farm<-as.factor(zbj_data$farm)
 
 # Simulate covariate data

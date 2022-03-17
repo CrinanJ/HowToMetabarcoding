@@ -1,9 +1,9 @@
 ##################################################
-## Project: metabarcoding and networks
+## Project: How to metabarcode (Rachel et al 2022)
 ## Script purpose: creating, plotting and analyzing bipartite networks 
-## Date: 10/09/2021
+## Date: 17/03/2022
 ## Author: Diogo F. Ferreira (ferreiradfa@gmail.com)
-## Packages: bipartite, ggplot2, ggthemes, GISTools and RColorBrewer 
+## Packages: openxlsx, iNEXT, bipartite, RColorBrewer, GISTools and ggplot2 
 ## Notes: you will need the function to generate_final_data.r to run this script
 ###################################################
 
@@ -36,10 +36,10 @@ n_distinct(zbj_data$predator)#number of samples
 
 
 ####aggregate data by landscape and species
-colnames(zbj_data)#keeping only species, prey, otu_order, landscape, weight, proportion and creating column for otu frequency
+colnames(zbj_data)#keeping only species, prey, otu_order, landscape, weight, proportion and creating column for otu FOO
 zbj_aggr <- zbj_data %>%
     group_by(predator=species_code,prey,otu_order,landscape)%>%
-    summarise(weight=sum(weight),proportion=mean(proportion),freq_otus=n())
+    summarise(weight=sum(weight),proportion=mean(proportion),FOO=n())
 head(zbj_aggr)
 dim(zbj_aggr)
 #1265 rows and 7 columns
@@ -54,10 +54,11 @@ zbj_species <- zbj_data %>%
     rename("predator"=species_code)
 head(zbj_species)
 
+#saving list of samples per species 
 write.csv(zbj_species,"outputs/results/network analysis/n_samples_network_zbj.csv",row.names = FALSE)
 
 ##I'll remove species that have less than 5 samples (ideally higher the cut-off the better) per landscape 
-species_remove_zbj <- unique(zbj_species[zbj_species$samples < 5, ])
+species_remove_zbj <- unique(zbj_species[zbj_species$samples < 5,])
 levels(as.factor(species_remove_zbj$predator))
 #I need to remove 3 species
 
@@ -78,14 +79,57 @@ levels(as.factor(zbj_filtered$predator))
 data_network <- merge(zbj_filtered, zbj_species, by = c("predator","landscape"))
 head(data_network)
 
-data_network$weight_std <- data_network$freq_otus/data_network$samples*100
+data_network$FOO_std <- data_network$FOO/data_network$samples*100
 head(data_network)
 
-##############Bipartite networkt - on bipartite package##############
-####generating an network based on a adjacency matrix and creating an each network based on landscape and using weight_std)
+
+#####################Checking sample coverage#####################
+##creating a empty data frame to store INEXT values
+#creating a matrix for network
+library(reshape2)
+#creating matrix for inext
+matrix_inext <- dcast(data_network, prey ~ landscape, length)
+head(matrix_inext)
+
+#adding total row
+matrix_inext <- rbind(data.frame("prey" = "Total", "Ayos"=sum(matrix_inext$Ayos),"Bokito"=sum(matrix_inext$Bokito),"Konye"=sum(matrix_inext$Konye)),matrix_inext)
+head(matrix_inext)
+
+#give names to rows
+rownames(matrix_inext) <- matrix_inext$prey
+head(matrix_inext)
+
+#removing ID column
+matrix_inext <- matrix_inext[-1]
+head(matrix_inext)
+
+
+##calculating rarefaction curves
+library(iNEXT)
+View(matrix_inext)
+icurves <- iNEXT(matrix_inext, datatype="incidence_freq", nboot=100)
+icurves
+
+##Save rarefaction curves results##
+write.csv(icurves$iNextEst,"outputs/results/network analysis/icurves.estimates.csv")
+write.csv(icurves$AsyEst, "outputs/results/network analysis/icurves.asymptote.csv")
+
+##Plot rarefaction curves##
+igraph_diversity<-ggiNEXT(icurves, type = 3)#1 for species diversity, 2 for sample coverage and 3 for species diversity vs sample coverage (gives samples completeness) 
+igraph_diversity #OTUs richness is still far from total sample coverage. Our network will not show a full representation of the diet. Also, differences in coverage between landscapes. This will limit the comparsions that we can do between landscapes. However, we will used null networks to minimize the effect of this. 
+
+igraph_coverage<-ggiNEXT(icurves, type = 2)
+igraph_coverage# to have a good representation of the diet we would need a higher number of samples (e.g. 750 samples to reach only 0.5 of coverage)
+
+##estimating richness at certain value of sampling
+estimateD(matrix_inext, datatype="incidence_freq", base="coverage", level=0.8)#base="coverage" , level=0.8 to know how many samples we need to reach 80% coverage in each landscape
+
+
+##############Bipartite network - on bipartite package##############
+####generating an network based on a adjacency matrix and creating an each network based on landscape and using FOO_std)
 #if you want to generate networks for other variables (e.g., season), you need to change webID
 library(bipartite)
-zbj_nets <- frame2webs(data.frame(lower=data_network$prey,higher=data_network$predator,webID=data_network$landscape,freq=data_network$weight_std),type.out="list")
+zbj_nets <- frame2webs(data.frame(lower=data_network$prey,higher=data_network$predator,webID=data_network$landscape,freq=data_network$FOO_std),type.out="list")
 lapply(zbj_nets, dim)#checking dimensions of all data frames
 
 unlist(lapply(zbj_nets, function(x) sum(x>=1)))#number of links per network
@@ -104,7 +148,7 @@ unlist(lapply(zbj_nets, ncol))#number of species per network
 #Ayos Bokito  Konye 
 #6      5      8 
 
-#####This tiny chunk shows how many MOTU are shared between networks
+#####This tiny chunk shows how many OTUs are shared between networks
 samples <- lapply(zbj_nets, rownames)
 Reduce(intersect, samples)
 length(Reduce(intersect, samples))
@@ -112,26 +156,27 @@ length(Reduce(intersect, samples))
 (length(Reduce(intersect, samples))/length(unique(zbj_filtered$prey)))*100
 #4.550898% of otus are shared between all networks
 
+
 ####Plotting bipartite network
-##creating pallete (28 colours and colorblind) to give to each arthrpod order
+##creating pallet (28 colors and colorblind) to give to each arthropod order
 library(RColorBrewer)
 palettes <- brewer.pal.info%>%
   mutate(name=row.names(brewer.pal.info))%>%
   filter(category == "qual",colorblind == TRUE)
 
-#vector of 28 colours
-col_vector <- unlist(mapply(brewer.pal, palettes$maxcolors, palettes$name))#28 colours
+#vector of 28 colors
+col_vector <- unlist(mapply(brewer.pal, palettes$maxcolors, palettes$name))#28 colors
 
-#matching each colour with an otu orders present in dataset
+#matching each color with an otu orders present in dataset
 col_order <- data.frame(otu_order=unique(zbj_filtered$otu_order), col=col_vector[1:length(unique(zbj_filtered$otu_order))])
 head(col_order)
 
-#setting transparency to colours for links
+#setting transparency to colors for links
 library(GISTools)
 col_order$col_links <- add.alpha(col_order$col,0.7)
 head(col_order)
 
-#mergind col_order with all OTUs 
+#merging col_order with all OTUs 
 zbj_col <- unique(merge(zbj_filtered[,c("prey","otu_order"),],col_order,by="otu_order"))
 head(zbj_col)
 
@@ -143,7 +188,7 @@ head(network_names)
 
 ####plotting a bipartite networks for each landscape
 ##nets: list of networks to use
-##col_otus: otus colours to use
+##col_otus: otus colors to use
 ##primer: primer that I'm using
 for (i in 1:length(zbj_nets)){
   primer <- "zbj"
@@ -158,18 +203,19 @@ for (i in 1:length(zbj_nets)){
 }
 
 
-######Network analysis
+######Network analyses
 ###Creating 10000 new networks based on on previous networks for the null model
-nullnetworks<-lapply(zbj_nets, nullmodel,N=1000,method="vaznull")
+nullnetworks<-lapply(zbj_nets, nullmodel,N=100,method="vaznull")#here just using 100 null netwroks as an example. 1000 steps are advised. 
 #Method can be changed (see nullmodel guide in bipartite package info)
+
 
 ###Network level metrics
 ##creating a empty data frame to store all zscores: z-scores are used to know if our metric values are significant compared with the null model
 zscores <- data.frame()
 
 library(ggplot2)
-##Nestedness
-#calculating nestedness for each of our networks as weighted nestedness based on overlap and decreasing fill (WNODF). High values indicate nestedness.
+##Nestedness - may time some time to compute
+#calculating nestedness for each of our networks as weighted nestedness based on overlap and decreasing fill (WNODF). High values indicate more nested networks. 
 for (i in 1:length(zbj_nets)){
   net <- zbj_nets[[i]]
   null <- nullnetworks[[i]]
@@ -190,21 +236,21 @@ for (i in 1:length(zbj_nets)){
   ggsave(paste("outputs/plots/network analysis/null_model_",names(zscore_nest),"_",names(zbj_nets[i]),".png",sep = ""), plot = plot, width =5 , height = 5) #To save the plot
   zscores <- rbind(zscores,data.frame(metric = names(zscore_nest), network=names(zbj_nets[i]),value = nest, zscore=as.vector(zscore_nest)))
 }
+#The three networks are less nested than expected, with Ayos and Konye being less nested than Bokito 
 
-
-##Modularity
-#calculating modularity for each of our networks. High values indicate modularity.
+##Modularity - may time some time to compute
+#calculating modularity for each of our networks. High values indicate higher modularity.
 for (i in 1:length(zbj_nets)){
   net <- zbj_nets[[i]]
   null <- nullnetworks[[i]]
   #measuring Modularity for each network
-  mod<-computeModules(net,method="Beckett",steps=1000)#higher number of steps to increase precision
-  #measuring Modularity for each of the null models
-  nullmod<-sapply(null,computeModules,method="Beckett",steps=1000)#higher number of steps to increase precision
-  #Creating object with all likelihood 
+  mod<-computeModules(net,method="Beckett",steps=100)#higher number of steps to increase precision - here just using 100 as an example. 1000 steps are advised. 
+  #measuring Modularity for each of the null models. 
+  nullmod<-sapply(null,computeModules,method="Beckett",steps=100)#higher number of steps to increase precision - here just using 100 as an example. 1000 steps are advised. 
+  #Creating object with all likelihoods 
   nulllikeli <- sapply(nullmod,function(x)x@likelihood)
   #calculates the z-score based on the likelihood 
-  zscore_mod <- (mod@likelihood-mean(nulllikeli))/sd(nulllikeli)##z-score is negative - what does it means? Should I create binary networks because of that?
+  zscore_mod <- (mod@likelihood-mean(nulllikeli))/sd(nulllikeli)
   #plot to see wheres does our zscore stands compared to the null models
   plot <- ggplot()+
     aes(nulllikeli)+
@@ -216,15 +262,17 @@ for (i in 1:length(zbj_nets)){
   ggsave(paste("outputs/plots/network analysis/null_model_modularity","_",names(zbj_nets[i]),".png",sep = ""), plot = plot, width =5 , height = 5) #To save the plot
   zscores <- rbind(zscores,data.frame(metric = "Modularity", network=names(zbj_nets[i]),value = mod@likelihood, zscore=as.vector(zscore_mod)))
 }
+#The three networks were more modular than expected, however Ayos was less modular when compared with the other two. 
 
 #In the case you want to plot the modules - not very useful for big networks
-mod_Bokito<-computeModules(zbj_nets$Bokito)
+mod_Bokito<-computeModules(zbj_nets$Bokito)#example for Bokito landscape
 plotModuleWeb(mod_Bokito)
 
 ##saving z-scores to csv file
 write.csv2(zscores,"outputs/results/network analysis/network_zscores_zbj.csv",row.names = FALSE)
 
-metrics_plot <- ggplot(data=zscores, aes(x=network, y=value))+ #again, excluding intercept because estimates so much larger
+#plotting s-scores 
+metrics_plot <- ggplot(data=zscores, aes(x=network, y=zscore))+ 
   geom_bar(stat='identity')+
   #scale_shape(solid=F)+ #no fill for points
   facet_wrap(~metric,ncol=2,scales="free_y")+
@@ -238,5 +286,6 @@ metrics_plot <- ggplot(data=zscores, aes(x=network, y=value))+ #again, excluding
   theme(strip.text.x = element_text(face="italic",size=25))+
   theme(strip.background = element_rect(fill = 'grey'))
 metrics_plot
+#We see that Modularity and Nestedness were significant in all networks. Bokito and Konye were more modular while Ayos and Konye were more nestedness. 
 
-ggsave("outputs/plots/network analysis/network_metrics_zbj.png", plot = metrics_plot, width =15 , height = 15) #To save the plot
+ggsave("outputs/plots/network analysis/zscore_metrics_zbj.png", plot = metrics_plot, width =15 , height = 12) #To save the plot
