@@ -11,14 +11,14 @@
   #function returns a plot with cut-line to remove samples based on control reads 
   #data frame with 19 columns: 
     #predator: sample number
-    #prey: OTU number
-    #weight: number of reads per OTU and sample
-    #otu_phylum: OTU phylum
-    #otu_class: OTU class
-    #otu_order: OTU order
-    #otu_family: OTU family
-    #otu_genus: OTU genus
-    #otu_species: OTU species.
+    #prey: ASV number
+    #weight: number of reads per ASV and sample
+    #asv_phylum: ASV phylum
+    #asv_class: ASV class
+    #asv_order: ASV order
+    #asv_family: ASV family
+    #asv_genus: ASV genus
+    #asv_species: ASV species.
     #year: year when the sample was collected
     #season: season when the sample was collected
     #landscape: landscape where the sample was collected
@@ -27,19 +27,19 @@
     #species_code: predator species code (first letter of predator genus in uppercase with first three letters of specific epithet in lowercase).
     #animal: if predator is a bird or bat
     #total_reads: total number of reads per sample
-    #proportion: proportion of an OTU in a sample based on the number of reads
+    #proportion: proportion of an ASV in a sample based on the number of reads
     
 ##INPUT: function to read, organize and clean metabarcoding data from Rachel et al 2022. Needs Metabarcoding data (organised the same way) and information associated to samples 
   #data: metabarcoding data with samples coming 1st and then controls with "Control" in the name
   #samples: sample_list with species information for each sample in data (lab.nbr,year,season,landscape,farm,species,species_code,animal). See line 115
   #remove_samples: TRUE if you want to remove samples that have less reads then the controls. Using "Control" to identify control columns. See line 49
   #keep_class: only keeping targeted taxonomic classes (default is c("Arachnida","Insecta")). If NULL keeps all classes. See line 129
-  #otus_clean: 0 to 5 if you want to exclude OTUs with less than 0% to 5% of total number of reads per sample. Default is 1 for 1% (e.g. add 0.01 for 0.01%). Values above 5 return error. See line 141
-  #remove_NAorders: TRUE if I want to remove OTUs that are not identified to order. See line 163
-  #remove_NAfamily: TRUE if I want to remove OTUs that are not identified to family. See line 173
+  #asvs_clean: 0 to 5 if you want to exclude ASVs with less than 0% to 5% of total number of reads per sample. Default is 1 for 1% (e.g. add 0.01 for 0.01%). Values above 5 return error. See line 141
+  #remove_NAorders: TRUE if I want to remove ASVs that are not identified to order. See line 163
+  #remove_NAfamily: TRUE if I want to remove ASVs that are not identified to family. See line 173
   #desired_species: predator species that I want to keep - uses species_code (first letter of genus in uppercase with first three letters of specific epithet in lowercase). See line 183
 
-final_metbar <- function(data = NA, sample_list = NA, remove_samples=F,keep_class=c("Arachnida","Insecta"),otus_clean=1,remove_NAorders=T,remove_NAfamily=F,desired_species=NULL){
+final_metbar <- function(data = NA, sample_list = NA, remove_samples=F,keep_class=c("Arachnida","Insecta"),asvs_clean=1,remove_NAorders=T,remove_NAfamily=F,desired_species=NULL){
  
   #######ORGANISING AND CLEANING METABARCODING DATA#####################
   metbarc <- data #metabarcoding data
@@ -92,20 +92,20 @@ final_metbar <- function(data = NA, sample_list = NA, remove_samples=F,keep_clas
   dim(links1)
   
   
-  ####Merging otus info 
+  ####Merging asvs info 
   ###subsetting original metabarcoding data to get taxa info
-  otus<-data.frame(otu=rownames(metbarc),subset(metbarc, select=c(phylum,class,order,family,genus,species)))
-  head(otus)
+  asvs<-data.frame(asv=rownames(metbarc),subset(metbarc, select=c(phylum,class,order,family,genus,species)))
+  head(asvs)
   
   #merging order with links
-  links_otu <- merge(links1, otus, by.x ="prey",by.y="otu",all.x = TRUE)
-  head(links_otu)
-  dim(links_otu)
+  links_asv <- merge(links1, asvs, by.x ="prey",by.y="asv",all.x = TRUE)
+  head(links_asv)
+  dim(links_asv)
   
   library(dplyr)
-  links_order <- links_otu%>%
+  links_order <- links_asv%>%
     select(c(predator,prey,weight,phylum,class,order,family,genus,species))%>%
-    rename(otu_phylum=phylum,otu_class=class,otu_order=order,otu_family=family,otu_genus=genus,otu_species=species)
+    rename(asv_phylum=phylum,asv_class=class,asv_order=order,asv_family=family,asv_genus=genus,asv_species=species)
   
   head(links_order)
   dim(links_order)
@@ -123,21 +123,21 @@ final_metbar <- function(data = NA, sample_list = NA, remove_samples=F,keep_clas
   dim(links_habitat)
   
   ##only want to keep relevant prey taxa - only want to keep Arthropoda:Arachnida and Insecta for now
-  levels(as.factor(links_habitat$otu_phylum))
-  levels(as.factor(links_habitat$otu_class))
+  levels(as.factor(links_habitat$asv_phylum))
+  levels(as.factor(links_habitat$asv_class))
   
   if(is.null(keep_class)){
     links_clean <- links_habitat
   } else{
     links_clean <-links_habitat%>%
-      filter(otu_class %in% keep_class)#default c("Arachnida","Insecta") - this can be changed to include other classes
+      filter(asv_class %in% keep_class)#default c("Arachnida","Insecta") - this can be changed to include other classes
   }
   dim(links_clean)
   head(links_clean)
   
   
-  ###Excluding otus with less than x% of total number of reads per sample
-  ##Creating column with proportion of otus per individual
+  ###Excluding asvs with less than x% of total number of reads per sample
+  ##Creating column with proportion of asvs per individual
   links_propor <- data.frame()
   for (i in 1:length(unique(links_clean$predator))){
     id <- links_clean[links_clean$predator==unique(links_clean$predator)[i],]#select links from a specific sample
@@ -149,21 +149,21 @@ final_metbar <- function(data = NA, sample_list = NA, remove_samples=F,keep_clas
   dim(links_propor)
   
     #if true only keeps rows with more than x% of reads
-  if(otus_clean==0){
+  if(asvs_clean==0){
     links_clean1 <- links_propor
-  }else if(otus_clean>5){
+  }else if(asvs_clean>5){
     stop("Threshold to high (only values from 0 to 5 are accepted)", call. = FALSE) 
   } else {
-    links_clean1 <- subset(links_propor, proportion >= (otus_clean/100))
+    links_clean1 <- subset(links_propor, proportion >= (asvs_clean/100))
   }
   dim(links_clean1)
   head(links_clean1)
   
   ##checking order to decide if I should pull only the records that got a hit to ORDER
   if(remove_NAorders==T){
-    sum(is.na(links_clean1$otu_order))
-    levels(as.factor(links_clean1$otu_order))
-    links_clean2 <- subset(links_clean1, otu_order !="NA")
+    sum(is.na(links_clean1$asv_order))
+    levels(as.factor(links_clean1$asv_order))
+    links_clean2 <- subset(links_clean1, asv_order !="NA")
   } else {
     links_clean2 <- links_clean1
   }
@@ -171,9 +171,9 @@ final_metbar <- function(data = NA, sample_list = NA, remove_samples=F,keep_clas
   
   ##checking family to decide if I should pull only the records that got a hit to family
   if(remove_NAfamily==T){
-    sum(is.na(links_clean2$otu_family))
-    levels(as.factor(links_clean2$otu_family))
-    links_clean3 <- subset(links_clean2, otu_family !="NA")
+    sum(is.na(links_clean2$asv_family))
+    levels(as.factor(links_clean2$asv_family))
+    links_clean3 <- subset(links_clean2, asv_family !="NA")
   } else {
     links_clean3 <- links_clean2
   }

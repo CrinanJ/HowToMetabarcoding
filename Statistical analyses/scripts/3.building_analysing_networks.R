@@ -8,8 +8,8 @@
 ###################################################
 
 ###importing metabarcoding data 
-#zbj primer: 224 samples, 2 controls and 2889 unique OTUS
-zbj <- read.csv2("data/16Farms_OTU_Table_vsearch.csv", dec = ".", row.names = 1,header = TRUE, check.names=FALSE,na.strings=c("NA", "NULL", "", ".")) 
+#zbj primer: 224 samples, 2 controls and 2889 unique ASVS
+zbj <- read.csv2("data/16Farms_ASV_Table_vsearch.csv", dec = ".", row.names = 1,header = TRUE, check.names=FALSE,na.strings=c("NA", "NULL", "", ".")) 
 dim(zbj)
 colnames(zbj)
 head(zbj)
@@ -21,24 +21,24 @@ colnames(samples_list)
 head(samples_list)
 
 ###Reading function that returns final data frame with all data organized and cleaned - see organise&clean_metabarcoding.r for more details
-source('scripts/organize&clean_metabarcoding.r')
+source('scripts/1.organize&clean_metabarcoding.r')
 
 unique(zbj$class)
-#remove all OTUs that represent less than 1%, keeping onky Arachnida and Insecta, and remove OTUs not identified until order
-zbj_data <- final_metbar(data = zbj,sample_list = samples_list, remove_samples=F,otus_clean=1, keep_class=c("Arachnida","Insecta"),remove_NAorders=T,remove_NAfamily=F,desired_species=NULL)
+#remove all ASVs that represent less than 1%, keeping onky Arachnida and Insecta, and remove ASVs not identified until order
+zbj_data <- final_metbar(data = zbj,sample_list = samples_list, remove_samples=F,asvs_clean=1, keep_class=c("Arachnida","Insecta"),remove_NAorders=T,remove_NAfamily=F,desired_species=NULL)
 head(zbj_data)
 dim(zbj_data)
 #1571 rows and 18 columns
-n_distinct(zbj_data$prey)#number of different otus
+n_distinct(zbj_data$prey)#number of different asvs
 #849
 n_distinct(zbj_data$predator)#number of samples 
 #218
 
 
 ####aggregate data by landscape and species
-colnames(zbj_data)#keeping only species, prey, otu_order, landscape, weight, proportion and creating column for otu FOO
+colnames(zbj_data)#keeping only species, prey, asv_order, landscape, weight, proportion and creating column for asv FOO
 zbj_aggr <- zbj_data %>%
-    group_by(predator=species_code,prey,otu_order,landscape)%>%
+    group_by(predator=species_code,prey,asv_order,landscape)%>%
     summarise(weight=sum(weight),proportion=mean(proportion),FOO=n())
 head(zbj_aggr)
 dim(zbj_aggr)
@@ -116,7 +116,7 @@ write.csv(icurves$AsyEst, "outputs/results/network analysis/icurves.asymptote.cs
 
 ##Plot rarefaction curves##
 igraph_diversity<-ggiNEXT(icurves, type = 3)#1 for species diversity, 2 for sample coverage and 3 for species diversity vs sample coverage (gives samples completeness) 
-igraph_diversity #OTUs richness is still far from total sample coverage. Our network will not show a full representation of the diet. Also, differences in coverage between landscapes. This will limit the comparsions that we can do between landscapes. However, we will used null networks to minimize the effect of this. 
+igraph_diversity #ASVs richness is still far from total sample coverage. Our network will not show a full representation of the diet. Also, differences in coverage between landscapes. This will limit the comparsions that we can do between landscapes. However, we will used null networks to minimize the effect of this. 
 
 igraph_coverage<-ggiNEXT(icurves, type = 2)
 igraph_coverage# to have a good representation of the diet we would need a higher number of samples (e.g. 750 samples to reach only 0.5 of coverage)
@@ -136,11 +136,11 @@ unlist(lapply(zbj_nets, function(x) sum(x>=1)))#number of links per network
 #Ayos Bokito  Konye 
 #401   453     373 
 
-unlist(lapply(zbj_nets, sum))#total otus frequency per network
+unlist(lapply(zbj_nets, sum))#total asvs frequency per network
 #Ayos         Bokito       Konye 
 #3937.143    4206.439    4951.661  
 
-unlist(lapply(zbj_nets, nrow))#number of otus per network
+unlist(lapply(zbj_nets, nrow))#number of asvs per network
 #Ayos Bokito  Konye 
 #339    351    298 
 
@@ -148,13 +148,13 @@ unlist(lapply(zbj_nets, ncol))#number of species per network
 #Ayos Bokito  Konye 
 #6      5      8 
 
-#####This tiny chunk shows how many OTUs are shared between networks
+#####This tiny chunk shows how many asvs are shared between networks
 samples <- lapply(zbj_nets, rownames)
 Reduce(intersect, samples)
 length(Reduce(intersect, samples))
-#38 otus shared
+#38 asvs shared
 (length(Reduce(intersect, samples))/length(unique(zbj_filtered$prey)))*100
-#4.550898% of otus are shared between all networks
+#4.550898% of asvs are shared between all networks
 
 
 ####Plotting bipartite network
@@ -167,8 +167,8 @@ palettes <- brewer.pal.info%>%
 #vector of 28 colors
 col_vector <- unlist(mapply(brewer.pal, palettes$maxcolors, palettes$name))#28 colors
 
-#matching each color with an otu orders present in dataset
-col_order <- data.frame(otu_order=unique(zbj_filtered$otu_order), col=col_vector[1:length(unique(zbj_filtered$otu_order))])
+#matching each color with an asv orders present in dataset
+col_order <- data.frame(asv_order=unique(zbj_filtered$asv_order), col=col_vector[1:length(unique(zbj_filtered$asv_order))])
 head(col_order)
 
 #setting transparency to colors for links
@@ -176,8 +176,8 @@ library(GISTools)
 col_order$col_links <- add.alpha(col_order$col,0.7)
 head(col_order)
 
-#merging col_order with all OTUs 
-zbj_col <- unique(merge(zbj_filtered[,c("prey","otu_order"),],col_order,by="otu_order"))
+#merging col_order with all ASVs 
+zbj_col <- unique(merge(zbj_filtered[,c("prey","asv_order"),],col_order,by="asv_order"))
 head(zbj_col)
 
 #creating new names for the networks
@@ -188,7 +188,7 @@ head(network_names)
 
 ####plotting a bipartite networks for each landscape
 ##nets: list of networks to use
-##col_otus: otus colors to use
+##col_asvs: asvs colors to use
 ##primer: primer that I'm using
 for (i in 1:length(zbj_nets)){
   primer <- "zbj"
@@ -198,14 +198,14 @@ for (i in 1:length(zbj_nets)){
   png(filename=paste("outputs/plots/network analysis/freq_landscape_network_",primer,"_",net_name$net,".png",sep=""),res= 300, height= 3000, width= 5000)#Open a device, using png()
   plotweb(net,  ybig=0.15, col.low= orders_plot$col, bor.col.low=orders_plot$col, col.interaction = rep(orders_plot$col_links, each = ncol(net)), bor.col.interaction=rep(orders_plot$col_links, each = ncol(net)), labsize=3, adj.high=c(0.5,0), method="normal",low.lablength=0, y.width.low=0.07, y.width.high=0.1)# could also use "cca" for method - avoids overlapping; col.high="orange4" and bor.col.high = "orange4" to change color of  nodes
   text(x = 0.65, y = 1.75, paste(net_name$new_names," (",primer,")",sep=""),cex = 2.5, col = "black")
-  legend(x=0,y=0.4,legend = unique(orders_plot$otu_order),x.intersp=0.3, ncol = 4, pch = 15,bty ="n", xpd = TRUE,inset = c(0,0), cex=1.7, title="Orders of arthropod OTUs", text.col = "gray20", title.col = "black",adj = c(0, 0.6),col=unique(orders_plot$col)) 
+  legend(x=0,y=0.4,legend = unique(orders_plot$asv_order),x.intersp=0.3, ncol = 4, pch = 15,bty ="n", xpd = TRUE,inset = c(0,0), cex=1.7, title="Orders of arthropod ASVs", text.col = "gray20", title.col = "black",adj = c(0, 0.6),col=unique(orders_plot$col)) 
   dev.off()#clear all plots and saving last plot
 }
 
 
 ######Network analyses
 ###Creating 10000 new networks based on on previous networks for the null model
-nullnetworks<-lapply(zbj_nets, nullmodel,N=100,method="vaznull")#here just using 100 null netwroks as an example. 1000 steps are advised. 
+nullnetworks<-lapply(zbj_nets, nullmodel,N=1000,method="vaznull")#here just using 1000 null networks as an example 
 #Method can be changed (see nullmodel guide in bipartite package info)
 
 
