@@ -130,3 +130,20 @@ DHARMa::testDispersion(mod_reads.nb,alternative="less") #data not underdispersed
 
 plot(lep_data_order$sum_weight~lep_data_order$landscape)
 plot(lep_data_order$sum_weight~lep_data_order$manage)
+
+### 3. MULTIVARIATE GENERALISED LINEAR MODELS: model joint distribution of prey groups as a function of explanatory variable (landscape)
+library(mvabund)
+
+# select columns that correspond to 'abundance' (i.e., number of reads) of each prey group in each sample
+reads_multivar<- data_recast[,5:ncol(data_recast)]
+# replace NAs (absences) with 0s
+reads_multivar[is.na(reads_multivar)]<-0
+# generate mvabund object, used in functions from mvabund package
+reads_dat<-mvabund(reads_multivar)
+# generate vector of explanatory variable (landscape)
+landscape<-data_recast[,4]
+
+# fit multivariate model. We selected negative binomial family to account for overdispersion in read abundance data.
+mod_multivar<-manyglm(reads_dat~landscape,family="negative.binomial")
+mod_multivar
+summary(mod_multivar) #output shows no significant effect of landscape on the composition of prey groups in diet
