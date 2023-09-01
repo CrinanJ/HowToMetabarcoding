@@ -195,8 +195,9 @@ for (i in 1:length(zbj_nets)){
   net <- zbj_nets[[i]]
   net_name <- network_names[network_names$net ==  names(zbj_nets[i]),]
   orders_plot <- zbj_col[zbj_col$prey %in% rownames(net),]#getting orders from that network
+  net_neworder <- net[orders_plot$prey, ] # Reorder rows to match colours by name manually
   png(filename=paste("outputs/plots/network analysis/freq_landscape_network_",primer,"_",net_name$net,".png",sep=""),res= 300, height= 3000, width= 5000)#Open a device, using png()
-  plotweb(net,  ybig=0.15, col.low= orders_plot$col, bor.col.low=orders_plot$col, col.interaction = rep(orders_plot$col_links, each = ncol(net)), bor.col.interaction=rep(orders_plot$col_links, each = ncol(net)), labsize=3, adj.high=c(0.5,0), method="normal",low.lablength=0, y.width.low=0.07, y.width.high=0.1)# could also use "cca" for method - avoids overlapping; col.high="orange4" and bor.col.high = "orange4" to change color of  nodes
+  plotweb(net_neworder,  ybig=0.15, col.low= orders_plot$col, bor.col.low=orders_plot$col, col.interaction = rep(orders_plot$col_links, each = ncol(net_neworder)), bor.col.interaction=rep(orders_plot$col_links, each = ncol(net_neworder)), labsize=3, adj.high=c(0.5,0), method="normal",low.lablength=0, y.width.low=0.07, y.width.high=0.1)# could also use "cca" for method - avoids overlapping; col.high="orange4" and bor.col.high = "orange4" to change color of  nodes
   text(x = 0.65, y = 1.75, paste(net_name$new_names," (",primer,")",sep=""),cex = 2.5, col = "black")
   legend(x=0,y=0.4,legend = unique(orders_plot$asv_order),x.intersp=0.3, ncol = 4, pch = 15,bty ="n", xpd = TRUE,inset = c(0,0), cex=1.7, title="Orders of arthropod ASVs", text.col = "gray20", title.col = "black",adj = c(0, 0.6),col=unique(orders_plot$col)) 
   dev.off()#clear all plots and saving last plot
