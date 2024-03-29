@@ -10,19 +10,19 @@
 
 ###importing metabarcoding data 
 #zbj primer: 224 samples, 2 controls and 2889 unique ASVS
-zbj <- read.csv2("16Farms_ASV_Table_vsearch.csv", dec = ".", row.names = 1,header = TRUE, check.names=FALSE,na.strings=c("NA", "NULL", "", ".")) 
+zbj <- read.csv2("./data/16Farms_ASV_Table.csv", dec = ".", row.names = 1,header = TRUE, check.names=FALSE,na.strings=c("NA", "NULL", "", ".")) 
 dim(zbj)
 colnames(zbj)
 head(zbj)
 
 ###importing species information for each sample
 library(openxlsx)#read excel and sheet
-samples_list <- read.xlsx("faeces_sample_database.xlsx", sheet = "samples")
+samples_list <- read.xlsx("./data/faeces_sample_database.xlsx", sheet = "samples")
 colnames(samples_list)
 head(samples_list)
 
 ###Reading function that returns final data frame with all data organized and cleaned - see organise&clean_metabarcoding.r for more details
-source('scripts/1.organize&clean_metabarcoding.r')
+source('./scripts/1.organize&clean_metabarcoding.r')
 
 unique(zbj$class)
 #remove all ASVs that represent less than 1%, keeping only Arachnida and Insecta, and remove ASVs not identified until order
@@ -33,11 +33,11 @@ zbj_data <- final_metbar(data = zbj,sample_list = samples_list,prefix_control = 
 
 head(zbj_data)
 dim(zbj_data)
-#1498  rows and 20 columns
+#2067  rows and 20 columns
 n_distinct(zbj_data$prey)#number of different asvs
-#823
+#1217
 n_distinct(zbj_data$predator)#number of samples 
-#216
+#265
 
 
 ####aggregate data by landscape and species
@@ -47,7 +47,7 @@ zbj_aggr <- zbj_data %>%
   summarise(weight=sum(weight),proportion=mean(proportion),FOO=n())
 head(zbj_aggr)
 dim(zbj_aggr)
-#1213 rows and 7 columns
+#1749 rows and 7 columns
 levels(as.factor(zbj_aggr$predator))#check how and what bats/bird species I have
 #11 
 
@@ -76,9 +76,9 @@ for (i in 1:length(unique(zbj_aggr$landscape))){
 }
 head(zbj_filtered)
 dim(zbj_filtered)
-#1167 rows and 7 columns
+#1718 rows and 7 columns
 levels(as.factor(zbj_filtered$predator))
-#9 species
+#10 species
 
 ####standardizing links (edges) by number of samples
 data_network <- merge(zbj_filtered, zbj_species, by = c("predator","landscape"))
@@ -116,15 +116,15 @@ icurves <- iNEXT(matrix_inext, datatype="incidence_freq", nboot=100)
 icurves
 
 ##Save rarefaction curves results##
-write.csv(icurves$iNextEst,"outputs/results/network analysis/icurves.estimates.csv")
-write.csv(icurves$AsyEst, "outputs/results/network analysis/icurves.asymptote.csv")
+write.csv(icurves$iNextEst,"./outputs/results/network analysis/icurves.estimates.csv")
+write.csv(icurves$AsyEst, "./outputs/results/network analysis/icurves.asymptote.csv")
 
 ##Plot rarefaction curves##
 igraph_diversity<-ggiNEXT(icurves, type = 1)#1 for species diversity, 2 for sample coverage and 3 for species diversity vs sample coverage (gives samples completeness) 
 igraph_diversity #ASVs richness is still far from total sample coverage. Our network will not show a full representation of the diet. Also, (some) differences in coverage between landscapes. This will limit the comparsions that we can do between landscapes. However, we will used null networks to minimize the effect of this. 
 
 igraph_coverage<-ggiNEXT(icurves, type = 2)
-igraph_coverage# to have a good representation of the diet we would need a higher number of samples (e.g. 750 samples to reach only 0.5 of coverage)
+igraph_coverage# to have a good representation of the diet we would need a higher number of samples (e.g. 800 samples to reach only 0.5 of coverage)
 
 ##estimating richness at certain value of sampling 
 estimateD(matrix_inext, datatype="incidence_freq", base="coverage", level=0.8) # to know how many samples we need to reach 80% coverage in each landscape
@@ -140,27 +140,27 @@ lapply(zbj_nets, dim)#checking dimensions of all data frames
 
 unlist(lapply(zbj_nets, function(x) sum(x>=1)))#number of links per network
 #Ayos Bokito  Konye 
-#394   434     339 
+#597  495     626 
 
 unlist(lapply(zbj_nets, sum))#total asvs frequency per network
 #Ayos         Bokito       Konye 
-#3890.000    3975.189    4298.216  
+#5148.716    4308.164    5967.342  
 
 unlist(lapply(zbj_nets, nrow))#number of asvs per network
 #Ayos Bokito  Konye 
-#333    342    276 
+#525   382    513 
 
 unlist(lapply(zbj_nets, ncol))#number of species per network
 #Ayos Bokito  Konye 
-#6      5      7 
+#7      5      8 
 
 #####This tiny chunk shows how many asvs are shared between networks
 samples <- lapply(zbj_nets, rownames)
 Reduce(intersect, samples)
 length(Reduce(intersect, samples))
-#33 asvs shared
+#37 asvs shared
 (length(Reduce(intersect, samples))/length(unique(zbj_filtered$prey)))*100
-#4.07911% of asvs are shared between all networks
+#3.070539% of asvs are shared between all networks
 
 
 ####Plotting bipartite network
@@ -276,7 +276,7 @@ mod_Bokito<-computeModules(zbj_nets$Bokito)#example for Bokito landscape
 plotModuleWeb(mod_Bokito)
 
 ##saving z-scores to csv file
-write.csv2(zscores,"outputs/results/network analysis/network_zscores_zbj.csv",row.names = FALSE)
+write.csv2(zscores,"./outputs/results/network analysis/network_zscores_zbj.csv",row.names = FALSE)
 
 #plotting s-scores 
 metrics_plot <- ggplot(data=zscores, aes(x=network, y=zscore))+ 
@@ -295,4 +295,4 @@ metrics_plot <- ggplot(data=zscores, aes(x=network, y=zscore))+
 metrics_plot
 #We see that Modularity and Nestedness were significant in all networks. Bokito and Konye were more modular while Ayos and Konye were more nestedness. 
 
-ggsave("outputs/plots/network analysis/zscore_metrics_zbj.png", plot = metrics_plot, width =15 , height = 12) #To save the plot
+ggsave("./outputs/plots/network analysis/zscore_metrics_zbj.png", plot = metrics_plot, width =15 , height = 12) #To save the plot
