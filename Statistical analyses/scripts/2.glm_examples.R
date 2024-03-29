@@ -20,13 +20,13 @@ library(glmmTMB)
 
 ### 1. FORMATTING DATA INTO DATAFRAME SUITABLE FOR GLMs
 # importing metabarcoding data 
-zbj <- read.csv2("16Farms_ASV_Table_vsearch.csv", dec = ".", row.names = 1,header = TRUE, check.names=FALSE,na.strings=c("NA", "NULL", "", ".")) 
+zbj <- read.csv2("./data/16Farms_ASV_Table.csv", dec = ".", row.names = 1,header = TRUE, check.names=FALSE,na.strings=c("NA", "NULL", "", ".")) 
 
 # importing species information for each sample
-samples_list <- read.xlsx("faeces_sample_database.xlsx", sheet = "samples")
+samples_list <- read.xlsx("./data/faeces_sample_database.xlsx", sheet = "samples")
 
 # Reading function that returns final data frame with all data organized and cleaned - see organize&clean_metabarcoding.r for more details
-source('scripts/organize&clean_metabarcoding.r')
+source('./scripts/1.organize&clean_metabarcoding.R')
 zbj_data <- final_metbar(data = zbj,sample_list = samples_list,prefix_control = "Control",
                          remove_samples=F,remove_control_ASVs=1,asvs_clean=1,hits_clean=0,
                          keep_class=c("Arachnida","Insecta"),remove_NAorders=T,
@@ -87,7 +87,7 @@ plot(occurrence_grouped$Diptera~occurrence_grouped$manage)
 
 ## EXAMPLE 2: %FOO (% Frequency of occurrence; proportion of individuals with Diptera present in diet)
 mod_percfoo<-glm(cbind(Diptera,sample_n) ~ manage + landscape, family = "binomial", data = occurrence_grouped)
-summary(mod_percfoo) #here the summary indicates that management and landscape don't significantly affect %FOO of Diptera 
+summary(mod_percfoo) #here the summary indicates that management doesn't have an effect on %FOO but landscape does 
 DHARMa::testDispersion(mod_percfoo,alternative="greater") #data not overdispersed
 DHARMa::testDispersion(mod_percfoo,alternative="less") #data not underdispersed
 
@@ -103,7 +103,7 @@ Diptera_data_order$landscape<-as.factor(Diptera_data_order$landscape)
 mod_wocc<-glm(cbind(order_asvs,total_asvs) ~ manage + landscape, family = "binomial", data = Diptera_data_order)
 summary(mod_wocc) #here the summary indicates that neither landscape or management significantly affect WOcc of Diptera
 DHARMa::testDispersion(mod_wocc,alternative="greater") #data not overdispersed
-DHARMa::testDispersion(mod_wocc,alternative="less") #data not underdispersed, if they were, could try alternative distribution family. See below for potential solution: log-transforming values and then using Gaussian distribution with offset
+DHARMa::testDispersion(mod_wocc,alternative="less") #data underdispersed, so we can try alternative distribution family. See below for potential solution: log-transforming values and then using Gaussian distribution with offset
 
 mod_wocc_log<-glm(log(order_asvs) ~ manage + landscape, offset = log(total_asvs), data = Diptera_data_order)
 summary(mod_wocc_log) #indicates that the WOcc is not significantly different. 
@@ -120,7 +120,7 @@ DHARMa::testDispersion(mod_rra,alternative="greater") #data overdispersed, sugge
 DHARMa::testDispersion(mod_rra,alternative="less") #data not underdispersed
 
 mod_rra.log<-glm(log(sum_weight) ~ manage + landscape, offset = log(total_reads), data = Diptera_data_order)
-summary(mod_rra.log) #model output now suggests a significant effect of management, but not of landscape on RRA (this is more what we would expect based on plots below)
+summary(mod_rra.log) #model output now suggests that neither management nor landscape have significant effects on RRA (this is more what we would expect based on plots below)
 DHARMa::testDispersion(mod_rra.log,alternative="greater") #data no longer overdispersed
 DHARMa::testDispersion(mod_rra.log,alternative="less") #data not underdispersed
 
@@ -134,7 +134,7 @@ DHARMa::testDispersion(mod_reads,alternative="greater") #data overdispersed, sug
 DHARMa::testDispersion(mod_reads,alternative="less") #data not underdispersed
 
 mod_reads.nb<-glm.nb(sum_weight ~ manage + landscape, data = Diptera_data_order)
-summary(mod_reads.nb) #model output still suggests that landscape and management have an effect on number of reads. 
+summary(mod_reads.nb) #model output still suggests that landscape and (marginally) management have an effect on number of reads. 
 DHARMa::testDispersion(mod_reads.nb,alternative="greater") #The overdispersion has been improved, though still could cause issues
 DHARMa::testDispersion(mod_reads.nb,alternative="less") #data not underdispersed
 
@@ -156,4 +156,4 @@ landscape<-data_recast[,4]
 # fit multivariate model. We selected negative binomial family to account for overdispersion in read abundance data.
 mod_multivar<-manyglm(reads_dat~landscape,family="negative.binomial")
 mod_multivar
-summary(mod_multivar) #output shows a no significant effect of landscape on the composition of prey groups in diet
+summary(mod_multivar) #output shows a that there is a marginally significant effect of landscape on the composition of prey groups in diet
