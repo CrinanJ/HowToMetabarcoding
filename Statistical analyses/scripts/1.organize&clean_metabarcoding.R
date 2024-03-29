@@ -180,7 +180,7 @@ final_metbar <- function(data = NA, sample_list = NA, prefix_control = "Control"
   
   ### Merging ASVs info 
   ## Subsetting original metabarcoding data to get taxa info
-  asvs <- data.frame(asv = rownames(metbarc), subset(metbarc, select=c(phylum, class, order, family, genus, species)))
+  asvs <- data.frame(asv = paste(prefix,rownames(metbarc),sep=""), subset(metbarc, select=c(phylum, class, order, family, genus, species)))
   head(asvs)
   
   ## Merging order with links
