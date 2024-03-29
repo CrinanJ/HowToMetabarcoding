@@ -1,3 +1,4 @@
+
 ##################################################
 ## Project: How to metabarcode (Rachel et al 2022)
 ## Script purpose: creating, plotting and analyzing bipartite networks 
@@ -9,14 +10,14 @@
 
 ###importing metabarcoding data 
 #zbj primer: 224 samples, 2 controls and 2889 unique ASVS
-zbj <- read.csv2("data/16Farms_ASV_Table_vsearch.csv", dec = ".", row.names = 1,header = TRUE, check.names=FALSE,na.strings=c("NA", "NULL", "", ".")) 
+zbj <- read.csv2("16Farms_ASV_Table_vsearch.csv", dec = ".", row.names = 1,header = TRUE, check.names=FALSE,na.strings=c("NA", "NULL", "", ".")) 
 dim(zbj)
 colnames(zbj)
 head(zbj)
 
 ###importing species information for each sample
 library(openxlsx)#read excel and sheet
-samples_list <- read.xlsx("data/faeces_sample_database.xlsx", sheet = "samples")
+samples_list <- read.xlsx("faeces_sample_database.xlsx", sheet = "samples")
 colnames(samples_list)
 head(samples_list)
 
@@ -24,43 +25,47 @@ head(samples_list)
 source('scripts/1.organize&clean_metabarcoding.r')
 
 unique(zbj$class)
-#remove all ASVs that represent less than 1%, keeping onky Arachnida and Insecta, and remove ASVs not identified until order
-zbj_data <- final_metbar(data = zbj,sample_list = samples_list, remove_samples=F,asvs_clean=1, keep_class=c("Arachnida","Insecta"),remove_NAorders=T,remove_NAfamily=F,desired_species=NULL)
+#remove all ASVs that represent less than 1%, keeping only Arachnida and Insecta, and remove ASVs not identified until order
+zbj_data <- final_metbar(data = zbj,sample_list = samples_list,prefix_control = "Control",
+                         remove_samples=F,remove_control_ASVs=1,asvs_clean=1,hits_clean=0,
+                         keep_class=c("Arachnida","Insecta"),remove_NAorders=T,
+                         remove_NAfamily=F,desired_species=NULL)
+
 head(zbj_data)
 dim(zbj_data)
-#1571 rows and 18 columns
+#1498  rows and 20 columns
 n_distinct(zbj_data$prey)#number of different asvs
-#849
+#823
 n_distinct(zbj_data$predator)#number of samples 
-#218
+#216
 
 
 ####aggregate data by landscape and species
 colnames(zbj_data)#keeping only species, prey, asv_order, landscape, weight, proportion and creating column for asv FOO
 zbj_aggr <- zbj_data %>%
-    group_by(predator=species_code,prey,asv_order,landscape)%>%
-    summarise(weight=sum(weight),proportion=mean(proportion),FOO=n())
+  group_by(predator=species,prey,asv_order,landscape)%>%
+  summarise(weight=sum(weight),proportion=mean(proportion),FOO=n())
 head(zbj_aggr)
 dim(zbj_aggr)
-#1265 rows and 7 columns
+#1213 rows and 7 columns
 levels(as.factor(zbj_aggr$predator))#check how and what bats/bird species I have
 #11 
 
 ##checking how many samples per species and landscape
 zbj_species <- zbj_data %>%
-    group_by(landscape,animal,species_code)%>%
-    summarise(samples = n_distinct(predator))%>%
-    mutate(total_samples = sum(samples),n_species = n_distinct(species_code))%>%#creates columns with total samples per landscaoe and total number of species
-    rename("predator"=species_code)
+  group_by(landscape,animal,species)%>%
+  summarise(samples = n_distinct(predator))%>%
+  mutate(total_samples = sum(samples),n_species = n_distinct(species))%>%#creates columns with total samples per landscaoe and total number of species
+  rename("predator"=species)
 head(zbj_species)
 
 #saving list of samples per species 
-write.csv(zbj_species,"outputs/results/network analysis/n_samples_network_zbj.csv",row.names = FALSE)
+write.csv(zbj_species,"n_samples_network_zbj.csv",row.names = FALSE)
 
 ##I'll remove species that have less than 5 samples (ideally higher the cut-off the better) per landscape 
 species_remove_zbj <- unique(zbj_species[zbj_species$samples < 5,])
 levels(as.factor(species_remove_zbj$predator))
-#I need to remove 3 species
+
 
 zbj_filtered <- data.frame()
 for (i in 1:length(unique(zbj_aggr$landscape))){
@@ -71,7 +76,7 @@ for (i in 1:length(unique(zbj_aggr$landscape))){
 }
 head(zbj_filtered)
 dim(zbj_filtered)
-#1227 rows and 7 columns
+#1167 rows and 7 columns
 levels(as.factor(zbj_filtered$predator))
 #9 species
 
@@ -115,14 +120,15 @@ write.csv(icurves$iNextEst,"outputs/results/network analysis/icurves.estimates.c
 write.csv(icurves$AsyEst, "outputs/results/network analysis/icurves.asymptote.csv")
 
 ##Plot rarefaction curves##
-igraph_diversity<-ggiNEXT(icurves, type = 3)#1 for species diversity, 2 for sample coverage and 3 for species diversity vs sample coverage (gives samples completeness) 
-igraph_diversity #ASVs richness is still far from total sample coverage. Our network will not show a full representation of the diet. Also, differences in coverage between landscapes. This will limit the comparsions that we can do between landscapes. However, we will used null networks to minimize the effect of this. 
+igraph_diversity<-ggiNEXT(icurves, type = 1)#1 for species diversity, 2 for sample coverage and 3 for species diversity vs sample coverage (gives samples completeness) 
+igraph_diversity #ASVs richness is still far from total sample coverage. Our network will not show a full representation of the diet. Also, (some) differences in coverage between landscapes. This will limit the comparsions that we can do between landscapes. However, we will used null networks to minimize the effect of this. 
 
 igraph_coverage<-ggiNEXT(icurves, type = 2)
 igraph_coverage# to have a good representation of the diet we would need a higher number of samples (e.g. 750 samples to reach only 0.5 of coverage)
 
-##estimating richness at certain value of sampling
-estimateD(matrix_inext, datatype="incidence_freq", base="coverage", level=0.8)#base="coverage" , level=0.8 to know how many samples we need to reach 80% coverage in each landscape
+##estimating richness at certain value of sampling 
+estimateD(matrix_inext, datatype="incidence_freq", base="coverage", level=0.8) # to know how many samples we need to reach 80% coverage in each landscape
+
 
 
 ##############Bipartite network - on bipartite package##############
@@ -134,27 +140,27 @@ lapply(zbj_nets, dim)#checking dimensions of all data frames
 
 unlist(lapply(zbj_nets, function(x) sum(x>=1)))#number of links per network
 #Ayos Bokito  Konye 
-#401   453     373 
+#394   434     339 
 
 unlist(lapply(zbj_nets, sum))#total asvs frequency per network
 #Ayos         Bokito       Konye 
-#3937.143    4206.439    4951.661  
+#3890.000    3975.189    4298.216  
 
 unlist(lapply(zbj_nets, nrow))#number of asvs per network
 #Ayos Bokito  Konye 
-#339    351    298 
+#333    342    276 
 
 unlist(lapply(zbj_nets, ncol))#number of species per network
 #Ayos Bokito  Konye 
-#6      5      8 
+#6      5      7 
 
 #####This tiny chunk shows how many asvs are shared between networks
 samples <- lapply(zbj_nets, rownames)
 Reduce(intersect, samples)
 length(Reduce(intersect, samples))
-#38 asvs shared
+#33 asvs shared
 (length(Reduce(intersect, samples))/length(unique(zbj_filtered$prey)))*100
-#4.550898% of asvs are shared between all networks
+#4.07911% of asvs are shared between all networks
 
 
 ####Plotting bipartite network
@@ -171,9 +177,9 @@ col_vector <- unlist(mapply(brewer.pal, palettes$maxcolors, palettes$name))#28 c
 col_order <- data.frame(asv_order=unique(zbj_filtered$asv_order), col=col_vector[1:length(unique(zbj_filtered$asv_order))])
 head(col_order)
 
-#setting transparency to colors for links
-library(GISTools)
-col_order$col_links <- add.alpha(col_order$col,0.7)
+#setting transparency to colors for links 
+library(scales)
+col_order$col_links <- alpha(col_order$col,0.7)
 head(col_order)
 
 #merging col_order with all ASVs 
@@ -231,7 +237,7 @@ for (i in 1:length(zbj_nets)){
     aes(nullnest)+
     geom_histogram(bins=100,fill="darkolivegreen3",colour="black")+
     theme_classic()+
-    geom_vline(xintercept=nest,linetype="solid",size=1,colour="red")+
+    geom_vline(xintercept=nest,linetype="solid",linewidth=1,colour="red")+
     ggtitle(names(zbj_nets[i])) 
   print(plot)
   ggsave(paste("outputs/plots/network analysis/null_model_",names(zscore_nest),"_",names(zbj_nets[i]),".png",sep = ""), plot = plot, width =5 , height = 5) #To save the plot
@@ -257,7 +263,7 @@ for (i in 1:length(zbj_nets)){
     aes(nulllikeli)+
     geom_histogram(binwidth = 0.001,fill="darkolivegreen3",colour="black")+
     theme_classic()+
-    geom_vline(xintercept=mod@likelihood,linetype="solid",size=1,colour="red")+
+    geom_vline(xintercept=mod@likelihood,linetype="solid",linewidth=1,colour="red")+
     ggtitle(names(zbj_nets[i])) 
   print(plot)
   ggsave(paste("outputs/plots/network analysis/null_model_modularity","_",names(zbj_nets[i]),".png",sep = ""), plot = plot, width =5 , height = 5) #To save the plot
