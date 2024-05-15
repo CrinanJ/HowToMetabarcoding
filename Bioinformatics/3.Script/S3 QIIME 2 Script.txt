@@ -1,0 +1,132 @@
+###############################
+## Project: Bioinformatic Workflow for Dietary DNA from Animal Faeces
+## Script purpose: Code to import, filter and assign taxonomy to fastq files using QIIME2
+## Date: 31/03/2024
+##Author: Rachel D. McConnell (rachel.mcconnell@durham.ac.uk)
+###############################
+
+## Download and install Qiime2
+## Follow the instructions found at https://docs.qiime2.org/2024.2/install/
+
+#Set up the working environment 
+#Change the working directory to the folder containing the data 
+cd /filepath   
+
+#Create a temporary directory
+mkdir /filepath
+Export TMPDIR=/filepath
+
+#Activate QIIME2
+conda activate “name of qiime environment” (eg qiime2-2023.7) 
+
+#Create the manifest file 
+## Note, this tells the pipeline where your input files are located so the manifest file will be different for every user. 
+echo -e 'sample-id\tforward-absolute-filepath\treverse-absolute-filepath' > manifest.tsv;
+for FOR in *_R1*fastq.gz; do ID=$(basename $FOR | cut -d_ -f1); REV=${FOR/_R1/_R2}; echo -e "$ID\t$PWD/$FOR\t$PWD/$REV"; done >> manifest.tsv
+
+#Import the data (3 minutes)
+qiime tools import --input-path manifest.tsv --type 'SampleData[PairedEndSequencesWithQuality]'  --output-path ZBJ_dataimported.qza --input-format PairedEndFastqManifestPhred33V2 
+
+## Remove the adapters (10 minutes)
+qiime cutadapt trim-paired \
+ --p-cores 20 \
+ --i-demultiplexed-sequences ZBJ_dataimported.qza \
+ --p-adapter-f CTGTCTCTTATACACATCTCCGAGCCCACGAGAC \
+ --p-adapter-r CTGTCTCTTATACACATCTGACGCTGCCGACGA \
+ --p-no-discard-untrimmed \
+ --o-trimmed-sequences cutadapters.qza \
+ --verbose > cutadapters.txt
+
+#Cut off the primers (5 minutes)
+qiime cutadapt trim-paired \
+ --p-cores 20 \
+ --i-demultiplexed-sequences cutadapters.qza \
+ --p-front-f AGATATTGGAACWTTATATTTTATTTTTGG \
+ --p-front-r WACTAATCAATTWCCAAATCCTCC \
+ --p-match-read-wildcards \
+ --p-match-adapter-wildcards \
+ --p-discard-untrimmed \
+ --o-trimmed-sequences cutZBJ.qza \
+ --verbose > cutZBJ.txt
+
+#Make a visualisation file of the trimmed sequences
+qiime demux summarize \
+--i-data cutZBJ.qza \
+--o-visualization cutZBJ.qzv
+
+#Denoise the ZBJ amplicons using DADA2 (20 minutes)
+qiime dada2 denoise-paired \
+ --i-demultiplexed-seqs cutZBJ.qza \
+ --p-trunc-len-f 104 \
+ --p-trunc-len-r 124 \
+ --p-n-threads 20 \
+ --o-table ZBJ_featuretable.qza \
+ --o-representative-sequences ZBJ_rep_seqs.qza \
+ --o-denoising-stats ZBJ_stats.qza
+
+#Make visualization files of the DADA2 outputs (2minutes)
+
+qiime feature-table summarize \
+ --i-table ZBJ_featuretable.qza \
+ --o-visualization ZBJ_featuretable.qzv
+
+qiime feature-table tabulate-seqs \
+ --i-data ZBJ_rep_seqs.qza\
+ --o-visualization ZBJ_rep_seqs.qzv
+
+qiime metadata tabulate \
+ --m-input-file ZBJ_stats.qza \
+ --o-visualization ZBJ_stats.qzv
+
+
+#install rescript (instructions here https://github.com/bokulich-lab/RESCRIPt) 
+
+# Download the reference sequences and taxonomy files from NCBI
+
+! qiime rescript get-ncbi-data --p-query "txid6656[ORGN] AND (cytochrome c oxidase subunit 1[Title] OR cytochrome c oxidase subunit I[Title] OR cytochrome oxidase subunit 1[Title] OR cytochrome oxidase subunit I[Title] OR COX1[Title] OR CO1[Title] OR COI[Title]) AND (mitochondrion[Filter] OR mitochondria[Filter] OR mitochondrial[Filter]) NOT environmental sample[Filter] NOT environmental samples[Filter] NOT environmental[Title] NOT uncultured[Title] NOT unclassified[Title] NOT unidentified[Title] NOT unverified[Title]" --p-ranks  kingdom phylum class order family genus species --p-rank-propagation --p-n-jobs 5 --o-sequences arthropoda-ref-seqs.qza --o-taxonomy arthropoda-ref-tax.qza  --verbose > Arthropoda.txt  --output-dir NCBI_Arthropoda
+
+
+## Dereplicate the database 
+! qiime rescript dereplicate \
+    --i-sequences arthropoda-ref-seqs.qza \
+    --i-taxa arthropoda-ref-tax.qza \
+    --p-mode 'uniq' \
+    --p-threads 10 \
+    --o-dereplicated-sequences arthropoda-ref-seqs-derep.qza \
+    --o-dereplicated-taxa arthropoda-ref-tax-derep.qza
+
+
+
+# Assign Taxonomy
+qiime feature-classifier classify-consensus-vsearch \
+    --i-query ZBJ_rep_seqs.qza  \
+    --i-reference-reads arthropoda-ref-seqs-derep.qza \
+    --i-reference-taxonomy  arthropoda-ref-tax-derep.qza\
+    --p-perc-identity 0.97 \
+    --p-threads 20 \
+    --o-classification 16farms-taxonomy.qza \
+    --o-search-results 16farms-results.qza
+
+
+#Create an ASV/OTU table 
+#Export the feature table
+qiime tools export --input-path ZBJ_featuretable.qza --output-path exported
+qiime tools export --input-path 16farms-taxonomy.qza --output-path exported
+cp exported/taxonomy.tsv exported/biom-taxonomy.tsv 
+cd ./exported
+
+#Change the header of the biom-taxonomy.tsv file
+#The header of the biom-taxonomytsv file needs to be changed from “Feature ID Taxon Confidence” to “#OTUID taxonomy confidence” with tab delimited spacing. 
+#This can be done manually by opening the tsv file and typing in the new title. 
+#The code requires the older terminology OTU (produced by clustering) to be used rather than ASV (which we produced with denoising). An OTU table and an ASV table contain the
+#same information but one is produced with OTUs and the other with ASVs. 
+
+#Add the taxonomy file to the feature table 
+biom add-metadata -i feature-table.biom -o table-with-taxonomy.biom --observation-metadata-fp biom-taxonomy.tsv --sc-separated taxonomy 
+
+#Convert the ASV/OTU biom file to tsv
+biom convert -i table-with-taxonomy.biom -o OTU-table.txt --to-tsv --header-key taxonomy
+
+#Add the confidence scores
+#The confidence scores from the metadata biom-taxonomy.tsv file can be added to the ASV/OTU table through merging the files together or copy and pasting the values in, such as in excel.
+
