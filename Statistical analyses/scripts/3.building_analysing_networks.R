@@ -27,9 +27,9 @@ source('./scripts/1.organize&clean_metabarcoding.r')
 unique(zbj$class)
 #remove all ASVs that represent less than 1%, keeping only Arachnida and Insecta, and remove ASVs not identified until order
 zbj_data <- final_metbar(data = zbj,sample_list = samples_list,prefix_control = "Control",
-                         remove_samples=F,remove_control_ASVs=1,asvs_clean=1,hits_clean=0,
-                         keep_class=c("Arachnida","Insecta"),remove_NAorders=T,
-                         remove_NAfamily=F,desired_species=NULL)
+                         remove_samples=F,remove_control_asvs=1,asvs_clean=1,
+                         control_asvs_clean=1, hits_clean=0,keep_class=c("Arachnida","Insecta"),
+                         remove_NAorders=T,remove_NAfamily=F,desired_species=NULL)
 
 head(zbj_data)
 dim(zbj_data)
@@ -43,7 +43,7 @@ n_distinct(zbj_data$predator)#number of samples
 ####aggregate data by landscape and species
 colnames(zbj_data)#keeping only species, prey, asv_order, landscape, weight, proportion and creating column for asv FOO
 zbj_aggr <- zbj_data %>%
-  group_by(predator=species,prey,asv_order,landscape)%>%
+  group_by(predator=species,prey,ASV_order,landscape)%>%
   summarise(weight=sum(weight),proportion=mean(proportion),FOO=n())
 head(zbj_aggr)
 dim(zbj_aggr)

@@ -28,9 +28,9 @@ samples_list <- read.xlsx("./data/faeces_sample_database.xlsx", sheet = "samples
 # Reading function that returns final data frame with all data organized and cleaned - see organize&clean_metabarcoding.r for more details
 source('./scripts/1.organize&clean_metabarcoding.R')
 zbj_data <- final_metbar(data = zbj,sample_list = samples_list,prefix_control = "Control",
-                         remove_samples=F,remove_control_ASVs=1,asvs_clean=1,hits_clean=0,
-                         keep_class=c("Arachnida","Insecta"),remove_NAorders=T,
-                         remove_NAfamily=F,desired_species=NULL)
+                         remove_samples=F,remove_control_asvs=1,asvs_clean=1,
+                         control_asvs_clean=1, hits_clean=0,keep_class=c("Arachnida","Insecta"),
+                         remove_NAorders=T,remove_NAfamily=F,desired_species=NULL)
 
 zbj_data$site<-as.factor(zbj_data$site)
 
@@ -44,7 +44,7 @@ zbj_data<-merge(zbj_data,management,by="site",
 
 # group dataframe by ASV order as we will use this taxonomic level for analyses
 zbj_data_order<- zbj_data %>%
-  group_by(site,predator,asv_order,year,season,landscape,species,total_reads,manage) %>%
+  group_by(site,predator,ASV_order,year,season,landscape,species,total_reads,manage) %>%
   summarise(order_asvs=n(),sum_weight=sum(weight))
 
 # calculate total ASVs per sample (used later for Weighted Abundance)
@@ -56,7 +56,7 @@ zbj_total<- zbj_data %>%
 zbj_data_order<-merge(zbj_data_order,zbj_total,by="predator")
 
 # casting dataframe into matrix predator x prey
-data_recast<-dcast(zbj_data_order, formula=predator+manage+total_reads+landscape~asv_order,value.var = "sum_weight")
+data_recast<-dcast(zbj_data_order, formula=predator+manage+total_reads+landscape~ASV_order,value.var = "sum_weight")
 
 ## For occurrence models
 # converting NAs into 0  and >1 into 1 for presence absence
@@ -97,7 +97,7 @@ plot((occurrence_grouped$Diptera/occurrence_grouped$sample_n)~occurrence_grouped
 ## EXAMPLE 3: Weighted Occurrence (number of detected ASVs corresponding to Diptera divided by the total number of ASVs detected in each individual)
 # first, we need to filter dataframe to select only Diptera rows
 Diptera_data_order<- zbj_data_order %>%
-  filter(asv_order=="Diptera")
+  filter(ASV_order=="Diptera")
 Diptera_data_order$landscape<-as.factor(Diptera_data_order$landscape)
 
 mod_wocc<-glm(cbind(order_asvs,total_asvs) ~ manage + landscape, family = "binomial", data = Diptera_data_order)
@@ -157,3 +157,4 @@ landscape<-data_recast[,4]
 mod_multivar<-manyglm(reads_dat~landscape,family="negative.binomial")
 mod_multivar
 summary(mod_multivar) #output shows a that there is a marginally significant effect of landscape on the composition of prey groups in diet
+

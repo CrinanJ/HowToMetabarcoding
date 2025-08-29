@@ -11,33 +11,32 @@
   #prey:            ASV number.
   #predator:        sample number.
   #weight:          number of reads.
-  #asv_phylum:      ASV phylum.
-  #asv_class:       ASV class.
-  #asv_order:       ASV order.
-  #asv_family:      ASV family.
-  #asv_genus:       ASV genus.
-  #asv_species:     ASV species.
+  #ASV_phylum:      ASV phylum.
+  #ASV_class:       ASV class.
+  #ASV_order:       ASV order.
+  #ASV_family:      ASV family.
+  #ASV_genus:       ASV genus.
+  #ASV_species:     ASV species.
   #site:            site where the sample was collected.
   #species:         predator species names.
   #total_reads:     total number of reads for that individual (sample) - AFTER cleaning.
-  #total_asvs:      total number of ASVs for that individual (sample) - AFTER cleaning.
+  #total_ASVs:      total number of ASVs for that individual (sample) - AFTER cleaning.
   #proportion:      proportion of an ASV in a sample based on the number of reads - AFTER cleaning.
   #reads_hit:       number reads for this taxon hit in a sample.
   #reads_hit_proportion: proportion of number reads for this taxon hit to all reads in a sample.
   
 ## INPUT: function to read, organize and clean metabarcoding data from pipeline by Andreanna Welch et al. 
   #data:            metabarcoding data with following format: samples starting with a letter prefix and control starting with "Control" (or other name). ASVs need to be read in as row names (e.g., read.csv("...", row.names="ASV")).
-  #samples:         sample_list with species information for each sample in data (lab.nbr, animal and species COMPULSORY, can add other variables like site, age and sex OPTIONALLY). See line 188.
-  #prefix_control:  in the data sheet, the prefix used to indicate control samples
-  #remove_samples:  TRUE if you want to remove samples that have less reads then the controls. Using "Control" to identify control columns. See line 101.
-  #remove_control_ASVs: TRUE if you want to remove ASVs that appear in control above cut-off (default: 1% of full run), FALSE if you want to keep all ASVs. See line 123.
-  #keep_class:      only keeping targeted taxonomic classes (default is c("Arachnida","Insecta")). If NULL keeps all classes. See line 196.
-  #hits_clean:      0 to 5; if you want to exclude taxon hits that make up less than 0% to 5% of total number of reads per sample. Default is 1 for 1% (e.g., add 0.01 for 0.01%). Values above 5 return error. See line 210.
-  #asvs_clean:      0 to 5; if you want to exclude ASVs with less than 0% to 5% of total number of reads per sample. Default is 1 for 1% (e.g., add 0.01 for 0.01%). Values above 5 return error. See line 250.
-  #control_ASVs_clean: percentage; if you want to remove ASVs that appear in control above the chosen cut-off (default: 1% of total reads of this ASV). Recommended. See line 276.
-  #remove_NAorders: TRUE if I want to remove ASVs that are not identified until order. See line 306.
-  #remove_NAfamily: TRUE if I want to remove ASVs that are not identified until family. See line 318.
-  #desired_species: species that I want to keep - uses species name. See line 330.
+  #samples:         sample_list with species information for each sample in data (lab_number, ring_number and species COMPULSORY, can add other variables like site, age and sex OPTIONALLY). See line 194.
+  #remove_samples:  TRUE if you want to remove samples that have less reads then the controls. Using "Control" to identify control columns. See line 109.
+  #remove_control_ASVs: TRUE if you want to remove ASVs that appear in control above cut-off (default: 1% of full run), FALSE if you want to keep all ASVs. See line 131.
+  #keep_class:      only keeping targeted taxonomic classes (default is c("Arachnida","Insecta")). If NULL keeps all classes. See line 206.
+  #hits_clean:      0 to 5; if you want to exclude taxon hits that make up less than 0% to 5% of total number of reads per sample. Default is 1 for 1% (e.g., add 0.01 for 0.01%). Values above 5 return error. See line 231.
+  #ASVs_clean:      0 to 5; if you want to exclude ASVs with less than 0% to 5% of total number of reads per sample. Default is 1 for 1% (e.g., add 0.01 for 0.01%). Values above 5 return error. See line 270.
+  #control_ASVs_clean: percentage; if you want to remove ASVs that appear in control above the chosen cut-off (default: 1% of total reads of this ASV). Recommended. See line 284.
+  #remove_NAorders: TRUE if I want to remove ASVs that are not identified until order. See line 314.
+  #remove_NAfamily: TRUE if I want to remove ASVs that are not identified until family. See line 326.
+  #desired_species: species that I want to keep - uses species name. See line 338.
 
 ## ! ##
 ## ! ## If the input data contains data about several metabarcoding runs (each with one or more controls), this function should be applied separately to each run.
@@ -45,13 +44,13 @@
 
 
 final_metbar <- function(data = NA, sample_list = NA, prefix_control = "Control", 
-                         remove_samples=F, remove_control_ASVs=F, keep_class=c("Arachnida", "Insecta"), hits_clean=0, asvs_clean=1,
-                         control_ASVs_clean=1, remove_NAorders=F, remove_NAfamily=F, desired_species=NULL){
+                         remove_samples=F, remove_control_asvs=F, keep_class=c("Arachnida", "Insecta"), hits_clean=0, asvs_clean=1,
+                         control_asvs_clean=1, remove_NAorders=F, remove_NAfamily=F, desired_species=NULL){
   # Packages needed --------------------------
   library(dplyr)
   library(reshape2) #for melt function
   library(tidyr) #for replace_na function
-  options(scipen = 999) # turns off scientific notation, good for step "control_ASVs_clean"
+  options(scipen = 999) # turns off scientific notation, good for step "control_asvs_clean"
   options(error=NULL) #I needed this, otherwise it opens an error browser when an error is thrown
   options(dplyr.summarise.inform = FALSE) #Turn of the warnings when grouping variables for dplyr::summarise()
   
@@ -61,15 +60,6 @@ final_metbar <- function(data = NA, sample_list = NA, prefix_control = "Control"
   ## If these columns are not present in sample_list, add them (for the sake of the code). They will be removed at the end if empty.
   if(!("site" %in% names(sample_list))) {
     sample_list$site <- NA
-  }
-  if(!("season" %in% names(sample_list))) {
-    sample_list$season <- NA
-  }
-  if(!("year" %in% names(sample_list))) {
-    sample_list$year <- NA
-  }
-  if(!("landscape" %in% names(sample_list))) {
-    sample_list$landscape <- NA
   }
   if(!("collection_date" %in% names(sample_list))) {
     sample_list$collection_date <- NA
@@ -132,7 +122,7 @@ final_metbar <- function(data = NA, sample_list = NA, prefix_control = "Control"
   
   # REMOVE_CONTROL_ASVS --------------------------
   ### Remove ASVs from dataset when they appear in controls at >1% of total run reads. Total run reads are reads from: all ASVs, all samples, all controls.
-  if(remove_control_ASVs == T){
+  if(remove_control_asvs == T){
     control_props <- dplyr::select(metbarc_clean, starts_with(prefix_control)) / reads_total * 100 #divide number of control reads for each ASV by the number of total run reads (>> yields a percentage)
     control_props1 <- data.frame(row.names = row.names(control_props), #make empty dataframe to store values
                                  "prop" = c(rep(NA, nrow(control_props))))
@@ -172,33 +162,34 @@ final_metbar <- function(data = NA, sample_list = NA, prefix_control = "Control"
   
   ## Add column about number of reads of each ASV in the control
   links2 <- dplyr::select(metbarc_clean12, starts_with(prefix_control)) %>%  #selects control columns
-    mutate(control_asvs = rowSums(.),
+    mutate(control_ASVs = rowSums(.),
            prey = row.names(.)) %>% 
-    dplyr::select(prey, control_asvs) %>% 
+    dplyr::select(prey, control_ASVs) %>% 
     left_join(links1, ., by = "prey") %>% as.data.frame
-  attr(links2$control_asvs, "ATT") <- NULL #delete attribute that was inserted due to rowSums()
+  attr(links2$control_ASVs, "ATT") <- NULL #delete attribute that was inserted due to rowSums()
   
   ### Merging ASVs info 
   ## Subsetting original metabarcoding data to get taxa info
-  asvs <- data.frame(asv = paste(prefix,rownames(metbarc),sep=""), subset(metbarc, select=c(phylum, class, order, family, genus, species)))
-  head(asvs)
+  ASVs <- data.frame(ASV = rownames(metbarc), subset(metbarc, select=c(phylum, class, order, family, genus, species)))
+  ASVs$ASV<-paste("X",ASVs$ASV,sep="")
+  head(ASVs)
   
   ## Merging order with links
-  links_asv <- merge(links2, asvs, by.x ="prey", by.y="asv", all.x = TRUE)
-  head(links_asv)
-  dim(links_asv)
-  links_order <- links_asv %>%
-    dplyr::select(c(predator, prey, weight, control_asvs, phylum, class, order, family, genus, species)) %>% #removes all other columns
-    dplyr::rename(asv_phylum = phylum, asv_class = class, asv_order = order, 
-                  asv_family = family, asv_genus = genus, asv_species = species)
+  links_ASV <- merge(links2, ASVs, by.x ="prey", by.y="ASV", all.x = TRUE)
+  head(links_ASV)
+  dim(links_ASV)
+  links_order <- links_ASV %>%
+    dplyr::select(c(predator, prey, weight, control_ASVs, phylum, class, order, family, genus, species)) %>% #removes all other columns
+    dplyr::rename(ASV_phylum = phylum, ASV_class = class, ASV_order = order, 
+                  ASV_family = family, ASV_genus = genus, ASV_species = species)
   head(links_order)
   dim(links_order)
   
   ### Merging metabarcoding data with species and habitat data
   samples <- sample_list #importing database with faeces samples ID
   info <- subset(samples, select = c(lab.nbr, animal, species, site, season, year, landscape, collection_date, long, lat, sex, age))
+  info$lab.nbr<-paste("X",info$lab.nbr,sep="")
   head(info)
-  info$lab.nbr<-paste(prefix,info$lab.nbr,sep="") #add prefix to lab number to match sample database
   links_habitat <- merge(links_order, info, by.x ="predator", by.y="lab.nbr", all.x = TRUE)
   head(links_habitat)
   dim(links_habitat)
@@ -206,13 +197,13 @@ final_metbar <- function(data = NA, sample_list = NA, prefix_control = "Control"
   
   # KEEP_CLASS --------------------------
   ## Only want to keep relevant prey taxa - only want to keep Arthropoda:Arachnida and Insecta for now
-  levels(as.factor(links_habitat$asv_phylum))
-  levels(as.factor(links_habitat$asv_class))
+  levels(as.factor(links_habitat$ASV_phylum))
+  levels(as.factor(links_habitat$ASV_class))
   if(is.null(keep_class)){
     links_clean <- links_habitat
   } else{
     links_clean <-links_habitat %>%
-      filter(asv_class %in% keep_class) #default c("Arachnida","Insecta") - this can be changed to include other classes
+      filter(ASV_class %in% keep_class) #default c("Arachnida","Insecta") - this can be changed to include other classes
   }
   dim(links_clean)
   head(links_clean)
@@ -223,11 +214,11 @@ final_metbar <- function(data = NA, sample_list = NA, prefix_control = "Control"
   for (i in 1:length(unique(links_clean$predator))){
     hd <- links_clean[links_clean$predator == unique(links_clean$predator)[i],] #select links from a specific individual
     total_reads <- sum(hd$weight)
-    hd <- hd %>% group_by(asv_phylum, asv_class, asv_order, asv_family, asv_genus, asv_species) %>% 
+    hd <- hd %>% group_by(ASV_phylum, ASV_class, ASV_order, ASV_family, ASV_genus, ASV_species) %>% 
       summarize(reads_hit = sum(weight),
                 reads_hit_proportion = reads_hit/total_reads)
     hd_join <- left_join(subset(links_clean, predator == unique(links_clean$predator)[i]), hd, 
-                         by=c('asv_phylum', 'asv_class', 'asv_order', 'asv_family', 'asv_genus', 'asv_species'))
+                         by=c('ASV_phylum', 'ASV_class', 'ASV_order', 'ASV_family', 'ASV_genus', 'ASV_species'))
     links_hit <- rbind(links_hit, hd_join)
   } 
   head(links_hit)
@@ -236,20 +227,20 @@ final_metbar <- function(data = NA, sample_list = NA, prefix_control = "Control"
   if(hits_clean == 0){
     links_clean1 <- links_hit
   }else if(hits_clean > 5){
-    stop("Threshold too high (only values from 0 to 5 are accepted in asvs_clean)", call. = FALSE) 
+    stop("Threshold too high (only values from 0 to 5 are accepted in ASVs_clean)", call. = FALSE) 
   } else {
     check_deleted_hits <- links_hit %>% filter(reads_hit_proportion < (hits_clean/100)) %>% 
-      group_by(asv_phylum, asv_class, asv_order, asv_family, asv_genus, asv_species) %>% 
+      group_by(ASV_phylum, ASV_class, ASV_order, ASV_family, ASV_genus, ASV_species) %>% 
       summarize(n_predators = n_distinct(predator),
                 min_prop = min(reads_hit_proportion),
                 max_prop = max(reads_hit_proportion)) %>% 
-      arrange(asv_phylum, asv_class, asv_order, asv_family, asv_genus, asv_species)
+      arrange(ASV_phylum, ASV_class, ASV_order, ASV_family, ASV_genus, ASV_species)
     check_kept_hits <- links_hit %>% filter(reads_hit_proportion >= (hits_clean/100)) %>% 
-      group_by(asv_phylum, asv_class, asv_order, asv_family, asv_genus, asv_species) %>% 
+      group_by(ASV_phylum, ASV_class, ASV_order, ASV_family, ASV_genus, ASV_species) %>% 
       summarize(n_predators = n_distinct(predator),
                 min_prop = min(reads_hit_proportion),
                 max_prop = max(reads_hit_proportion)) %>% 
-      arrange(asv_phylum, asv_class, asv_order, asv_family, asv_genus, asv_species)
+      arrange(ASV_phylum, ASV_class, ASV_order, ASV_family, ASV_genus, ASV_species)
     
     ## Filter
     links_clean1 <- subset(links_hit, reads_hit_proportion >= (hits_clean/100))
@@ -265,7 +256,7 @@ final_metbar <- function(data = NA, sample_list = NA, prefix_control = "Control"
   for (i in 1:length(unique(links_clean1$predator))){
     id <- links_clean1[links_clean1$predator == unique(links_clean1$predator)[i],] %>% #select links from a specific individual
       mutate(total_reads = sum(weight), #calculates total number of reads for that individual
-             total_asvs = n_distinct(prey), #calculates total number of ASVs for that individual
+             total_ASVs = n_distinct(prey), #calculates total number of ASVs for that individual
              proportion = weight/total_reads) #calculates proportions of each ASV's reads to total reads for that individual
     links_propor <- rbind(links_propor, id)
   } 
@@ -275,7 +266,7 @@ final_metbar <- function(data = NA, sample_list = NA, prefix_control = "Control"
   if(asvs_clean == 0){
     links_clean2 <- links_propor
   }else if(asvs_clean > 5){
-    stop("Threshold too high (only values from 0 to 5 are accepted in asvs_clean)", call. = FALSE) 
+    stop("Threshold too high (only values from 0 to 5 are accepted in ASVs_clean)", call. = FALSE) 
   } else {
     ## Filter
     links_clean2 <- subset(links_propor, proportion >= (asvs_clean/100))
@@ -286,29 +277,29 @@ final_metbar <- function(data = NA, sample_list = NA, prefix_control = "Control"
   
   # CONTROL_ASVS_CLEAN --------------------------
   ### Remove ASVs from samples when they appear in controls at >1% (of the total occurrence of this ASV in the dataset.
-  if(control_ASVs_clean == 0){
+  if(control_asvs_clean == 0){
     links_clean3 <- links_clean2
-  } else if(control_ASVs_clean > 0 & control_ASVs_clean < 100){
+  } else if(control_asvs_clean > 0 & control_asvs_clean < 100){
     links_clean3 <- links_clean2 %>% 
       
       ## For each ASV, add the number of reads in the control to the number of reads present in all samples/predators
-      group_by(prey) %>% summarize(total_asv_reads = 
+      group_by(prey) %>% summarize(total_ASV_reads = 
                                      sum(weight) + #sum of reads of a ASV in all samples
-                                     unique(control_asvs)) %>% #unique, because the number of asv reads in the control is repeated for each sample/predator
+                                     unique(control_ASVs)) %>% #unique, because the number of ASV reads in the control is repeated for each sample/predator
       merge(links_clean2, .) %>% #add the new info to dataset
       ## Calculate per ASV the proportion of control reads to the total reads
-      mutate(perc_control_of_total_asv_reads = control_asvs / total_asv_reads * 100,
-             perc_control_of_total_asv_reads = replace_na(perc_control_of_total_asv_reads, 0)) #because NaN were created due to division with 0
+      mutate(perc_control_of_total_ASV_reads = control_ASVs / total_ASV_reads * 100,
+             perc_control_of_total_ASV_reads = replace_na(perc_control_of_total_ASV_reads, 0)) #because NaN were created due to division with 0
     
     ## Checking which ASVs will be removed >> Check which cut-off makes sense for your dataset
     check_kept_df <- links_clean3 %>% 
-      dplyr::select(total_asvs, total_asv_reads, control_asvs, perc_control_of_total_asv_reads, asv_phylum:asv_species) %>%  #make the dataset easier to read (slim down)
-      filter(perc_control_of_total_asv_reads >= control_ASVs_clean)
+      dplyr::select(total_ASVs, total_ASV_reads, control_ASVs, perc_control_of_total_ASV_reads, ASV_phylum:ASV_species) %>%  #make the dataset easier to read (slim down)
+      filter(perc_control_of_total_ASV_reads >= control_asvs_clean)
     check_kept_df
     
     ## Remove ASVs that are found in the control at >1% (default) of their total occurrence in the dataset
-    links_clean3 <- filter(links_clean3, perc_control_of_total_asv_reads < control_ASVs_clean) %>% 
-      dplyr::select(-c(perc_control_of_total_asv_reads, total_asv_reads, control_asvs))
+    links_clean3 <- filter(links_clean3, perc_control_of_total_ASV_reads < control_asvs_clean) %>% 
+      dplyr::select(-c(perc_control_of_total_ASV_reads, total_ASV_reads, control_ASVs))
   } else {
     stop("Threshold too high (only values from 0 to 100 are accepted in control_ASVs_clean)", call. = FALSE) 
   }
@@ -317,21 +308,21 @@ final_metbar <- function(data = NA, sample_list = NA, prefix_control = "Control"
   # REMOVE_NAORDERS --------------------------
   ### Checking order to decide if I should pull only the records that got a hit to ORDER
   if(remove_NAorders == T){
-    sum(is.na(links_clean3$asv_order))
-    levels(as.factor(links_clean3$asv_order))
-    links_clean4 <- subset(links_clean3, asv_order != "NA")
+    sum(is.na(links_clean3$ASV_order))
+    levels(as.factor(links_clean3$ASV_order))
+    links_clean4 <- subset(links_clean3, ASV_order != "NA")
   } else {
     links_clean4 <- links_clean3
   }
   dim(links_clean4)
   
   
-  # REMOVE_NAFAMILY --------------------------
+  # REMOVE_FAMILY --------------------------
   ### Checking family to decide if I should pull only the records that got a hit to family
   if(remove_NAfamily == T){
-    sum(is.na(links_clean4$asv_family))
-    levels(as.factor(links_clean4$asv_family))
-    links_clean5 <- subset(links_clean4, asv_family != "NA")
+    sum(is.na(links_clean4$ASV_family))
+    levels(as.factor(links_clean4$ASV_family))
+    links_clean5 <- subset(links_clean4, ASV_family != "NA")
   } else {
     links_clean5 <- links_clean4
   }
@@ -350,18 +341,18 @@ final_metbar <- function(data = NA, sample_list = NA, prefix_control = "Control"
   dim(links_filter)
   
   
-  # update total_reads, total_asvs, proportions --------------------------
+  # update total_reads, total_ASVs, proportions --------------------------
   links_filter1 <- links_filter %>% 
-    dplyr::select(-c(total_reads,total_asvs,proportion,reads_hit,reads_hit_proportion))
+    dplyr::select(-c(total_reads,total_ASVs,proportion,reads_hit,reads_hit_proportion))
   
   links_filter2 <- group_by(links_filter1, predator) %>% summarize(total_reads = sum(weight),
-                                                                   total_asvs = length(unique(prey))) %>% 
+                                                                   total_ASVs = length(unique(prey))) %>% 
     left_join(links_filter1, ., by = "predator") %>% 
     mutate(proportion = weight / total_reads)
   links_filter3 <- links_filter2 %>%
-    group_by(predator, asv_phylum, asv_class, asv_order, asv_family, asv_genus, asv_species) %>% reframe(reads_hit = sum(weight),
+    group_by(predator, ASV_phylum, ASV_class, ASV_order, ASV_family, ASV_genus, ASV_species) %>% reframe(reads_hit = sum(weight),
                                                                                                  reads_hit_proportion = reads_hit/total_reads) %>% unique %>% 
-    left_join(links_filter2, ., by = c("predator", "asv_phylum", "asv_class", "asv_order", "asv_family", "asv_genus", "asv_species")) %>%
+    left_join(links_filter2, ., by = c("predator", "ASV_phylum", "ASV_class", "ASV_order", "ASV_family", "ASV_genus", "ASV_species")) %>%
     dplyr::select(where(~ !(all(is.na(.)) | all(. == "")))) #remove all empty columns that were added to make the code work
   
 
